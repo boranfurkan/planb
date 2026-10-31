@@ -12,7 +12,7 @@ Before you start: open the deployed URL in Chrome, allow the microphone once, an
 | 1:15 | "The verifier loop checks every line live and re-plans anything with severe delays. A guardrail callback makes sure no agent can route through the line I reported, even if the model forgets." | Verifier glows |
 | 1:35 | "Plan A: get to Lewisham, the DLR is running. Note the badge: the official feed doesn't show this yet. It planned from my report." | Plan tickets slide in; voice reads Plan A aloud |
 | 2:00 | "And my report is shared. The next traveller at Lee is warned before the official feeds catch up." | Second phone: red traveller-reports ticker |
-| 2:15 | Follow-up: "I can't afford a taxi, remember that." | "🧠 Remembering for next time"; re-plan without taxis |
+| 2:15 | "And it isn't only trains. Driving, a crash ahead that no app shows yet:" click 🚗 Crash ahead on the A2 | Road scout; map: red blocked route, green detour, "Reported incident" |
 | 2:35 | "ADK sequential, parallel and loop agents, callbacks and user-scoped memory; our own MCP server; Gemini on Vertex AI with Gemini TTS; deployed on Cloud Run." | Pipeline header, then the GitHub README |
 | 2:50 | "Plan B: when the station knows before the app does." | |
 
