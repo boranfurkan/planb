@@ -2,7 +2,7 @@
 // London time, departure-board style. Rendered after mount to avoid a server/client time mismatch.
 import { useEffect, useState } from "react";
 
-const fmt = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+const fmt = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", hour: "2-digit", minute: "2-digit" });
 
 export function BoardClock() {
   const [now, setNow] = useState<string | null>(null);
@@ -13,8 +13,8 @@ export function BoardClock() {
     return () => clearInterval(id);
   }, []);
   return (
-    <span className="pb-board font-mono text-lg tabular-nums" aria-label="London time">
-      {now ?? "--:--:--"}
+    <span className="font-mono text-[12.5px] tabular-nums text-[#c9cad0]" aria-label="London time">
+      {now ?? "--:--"}
     </span>
   );
 }

@@ -110,5 +110,12 @@ export function usePlanB() {
     [busy, turns.length],
   );
 
-  return { turns, busy, send };
+  /** Back to the start; a new conversation (preferences stay with this browser). */
+  const reset = useCallback(() => {
+    if (busy) return;
+    session.current = null;
+    setTurns([]);
+  }, [busy]);
+
+  return { turns, busy, send, reset };
 }

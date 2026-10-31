@@ -1,50 +1,70 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Activity } from "@/components/plan-b/activity";
+import { useCallback, useSyncExternalStore } from "react";
 import { BoardClock } from "@/components/plan-b/board-clock";
-import { Composer, type SendOptions } from "@/components/plan-b/composer";
 import { affectedStations, driveRoutesFor, knownPlaces } from "@/components/plan-b/format";
+import { Hero } from "@/components/plan-b/hero";
 import type { MapData } from "@/components/plan-b/journey-map";
-import { Pipeline } from "@/components/plan-b/pipeline";
 import { PhoneQr } from "@/components/plan-b/phone-qr";
-import { PlanCards } from "@/components/plan-b/plan-cards";
-import { ReportsTicker } from "@/components/plan-b/reports-ticker";
 import { type Turn, usePlanB } from "@/components/plan-b/use-plan-b";
+import { useVoiceInput } from "@/components/plan-b/use-voice-input";
+import { VoiceOverlay } from "@/components/plan-b/voice-overlay";
+import { AgentPanel, FollowUp, PlanPanel } from "@/components/plan-b/workspace";
 import { parseAgentJson } from "@/lib/agent-json";
 import type { Situation } from "@/lib/plan-types";
 
 const JourneyMap = dynamic(() => import("@/components/plan-b/journey-map"), {
   ssr: false,
-  loading: () => <div className="h-full w-full animate-pulse bg-white/[0.03]" />,
+  loading: () => <div className="absolute inset-0 bg-[#0a0a0c]" />,
 });
+
+const NOISE =
+  "url(data:image/svg+xml;utf8,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%27180%27%20height=%27180%27%3E%3Cfilter%20id=%27n%27%3E%3CfeTurbulence%20type=%27fractalNoise%27%20baseFrequency=%270.85%27%20numOctaves=%273%27%20stitchTiles=%27stitch%27/%3E%3C/filter%3E%3Crect%20width=%27100%25%27%20height=%27100%25%27%20filter=%27url(%23n)%27/%3E%3C/svg%3E)";
+
+const WIDE = "(min-width: 1100px)";
+const subscribeWide = (cb: () => void) => {
+  const mq = window.matchMedia(WIDE);
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
+};
+const useWide = () =>
+  useSyncExternalStore(
+    subscribeWide,
+    () => window.matchMedia(WIDE).matches,
+    () => true,
+  );
 
 function mapData(turn: Turn, situation?: Situation): MapData {
   const places = knownPlaces(turn.calls.filter((c) => c.name === "find_place"));
   const drive = driveRoutesFor(turn.calls);
+  const scanned = turn.calls.some((c) => c.name === "nearby_stations" && c.result !== undefined) || Boolean(situation);
   return {
+    stage: turn.plan ? "route" : scanned ? "scan" : "origin",
     origin: situation?.origin ?? places[0],
     destination: situation?.destination ?? places[1],
-    hubs: (situation?.escapeHubs ?? []).filter((h) => typeof h.lat === "number").slice(0, 2),
+    hubs: (situation?.escapeHubs ?? []).filter((h) => typeof h.lat === "number").slice(0, 1),
     affected: affectedStations(turn.calls),
     incident: drive.incident ?? (situation?.mode === "driving" ? situation.incident : undefined),
     routes: drive.routes,
   };
 }
 
-function Header() {
+function Header({ onHome }: { onHome: () => void }) {
   return (
-    <header className="flex items-center gap-4 border-b border-white/10 pb-4">
-      <div className="flex items-baseline gap-3">
-        <span className="text-2xl font-black tracking-tight text-white">
-          Plan&nbsp;<span className="text-amber-400">B</span>
-        </span>
-        <span className="hidden text-sm text-slate-400 sm:inline">When the station knows before the app does</span>
-      </div>
-      <div className="ml-auto flex items-center gap-4">
-        <span className="hidden items-center gap-2 text-xs text-slate-400 md:flex">
-          <span className="pb-pulse h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true" />
-          Live TfL data
+    <header className="absolute inset-x-0 top-0 z-[700] flex items-center gap-3.5 px-7 py-[22px]">
+      <button
+        type="button"
+        onClick={onHome}
+        className="flex items-center gap-2.5 rounded-full text-[#ededf0] focus-visible:ring-2 focus-visible:ring-[#f5b24e] focus-visible:outline-none"
+      >
+        <span className="h-[18px] w-[18px] rounded-full bg-[radial-gradient(circle_at_35%_30%,#fff4e2,#f5b24e_45%,#b8462e)] shadow-[0_0_16px_rgba(245,178,78,0.6)]" />
+        <span className="text-base font-medium tracking-[-0.01em]">Plan B</span>
+      </button>
+      <div className="ml-auto flex items-center gap-[18px] text-[12.5px] text-[#8a8d95]">
+        <span className="hidden items-center gap-2 sm:flex">
+          <span className="pb-pulse h-1.5 w-1.5 rounded-full bg-[#5fd49a] shadow-[0_0_8px_#5fd49a]" />
+          Live TfL
         </span>
         <PhoneQr />
         <BoardClock />
@@ -53,138 +73,69 @@ function Header() {
   );
 }
 
-const STEPS = [
-  { icon: "🗣️", title: "Tell it what you see", text: "“Staff say every train is cancelled.” “A lorry has blocked the road ahead.” Type it, or just say it." },
-  {
-    icon: "🤖",
-    title: "Six agents re-plan around it",
-    text: "They work out what your report knocks out, find a way round on a network or road that still works, and check every line live.",
-  },
-  { icon: "📣", title: "The next person is warned", text: "Your report is shared with other travellers before the official feeds catch up." },
-];
-
-function Hero({ busy, onSend }: { busy: boolean; onSend: (t: string, opts?: SendOptions) => void }) {
-  return (
-    <section className="mx-auto max-w-4xl py-12 sm:py-16">
-      <div className="text-center">
-        <p className="mb-4 font-mono text-xs uppercase tracking-[0.3em] text-amber-300/80">A “my situation isn’t on the map yet” button for your maps app</p>
-        <h1 className="text-4xl font-black tracking-tight text-balance text-white sm:text-6xl">
-          Your station just closed.
-          <br />
-          <span className="text-amber-400">The apps don’t know yet.</span>
-        </h1>
-        <p className="mx-auto mt-5 max-w-2xl text-base text-pretty text-slate-400 sm:text-lg">
-          Google Maps and Citymapper run on official feeds, and feeds lag behind the staff at the gate or the crash in front of you. Tell Plan B what you
-          see, and its agents re-plan around it with live London data.
-        </p>
-      </div>
-      <div className="mx-auto mt-8 max-w-3xl">
-        <Composer busy={busy} onSend={onSend} followUp={false} />
-      </div>
-
-      <div className="mt-10 grid gap-3 sm:grid-cols-3">
-        {STEPS.map((s, i) => (
-          <div key={s.title} className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
-            <p className="font-mono text-xs text-amber-300/80">0{i + 1}</p>
-            <p className="mt-1 font-semibold text-white">
-              <span aria-hidden="true">{s.icon} </span>
-              {s.title}
-            </p>
-            <p className="mt-1 text-sm text-pretty text-slate-400">{s.text}</p>
-          </div>
-        ))}
-      </div>
-
-      <figure className="mt-6 rounded-2xl border border-amber-400/25 bg-amber-400/[0.05] p-5">
-        <p className="font-mono text-xs uppercase tracking-[0.2em] text-amber-300">Why it exists · Sunday 25 October · Lee station</p>
-        <blockquote className="mt-2 text-pretty text-slate-200">
-          “Staff at the entrance said every train was cancelled because of the wind. Google Maps still told me to take the train from Lee. I didn’t know
-          my options, so I guessed: an Uber to Lewisham, a bigger station with more lines. It worked, but I worked it out alone, and late. Plan B is the
-          agent I wanted.”
-        </blockquote>
-      </figure>
-
-      <p className="mt-6 text-center text-sm text-slate-400">
-        When the apps are right, use the apps. <span className="text-white">Plan B is for the gap</span>, and when the feeds catch up it uses them too.
-      </p>
-      <p className="mt-2 text-center text-xs text-slate-500">
-        🚆 Trains, Tube, DLR &amp; Overground · 🚌 Buses · 🚗 Driving · Google ADK multi-agent · Gemini on Vertex AI · London Live MCP server
-      </p>
-    </section>
-  );
-}
-
-function Run({ turn }: { turn: Turn }) {
+function Workspace({
+  turn,
+  busy,
+  onSend,
+  onVoice,
+  voiceReady,
+}: {
+  turn: Turn;
+  busy: boolean;
+  onSend: (t: string) => void;
+  onVoice: () => void;
+  voiceReady: boolean;
+}) {
+  const wide = useWide();
   const situation = parseAgentJson<Situation>(turn.outputs.situation_analyst);
   const data = mapData(turn, situation);
-  const feeds = situation?.officialFeedShowsIt === false ? "ahead" : situation?.officialFeedShowsIt === true ? "confirmed" : "unknown";
   return (
-    <div className="grid gap-5 lg:grid-cols-12">
-      <div className="lg:col-span-12">
-        <Pipeline turn={turn} />
+    <div className="relative z-10 flex flex-col gap-3.5 px-3.5 pb-6 pt-[78px] min-[1100px]:h-screen min-[1100px]:p-0">
+      <div className="relative h-[max(46vh,380px)] flex-none overflow-hidden rounded-3xl min-[1100px]:absolute min-[1100px]:inset-0 min-[1100px]:h-full min-[1100px]:rounded-none">
+        <JourneyMap data={data} padLeft={wide ? 440 : 30} padRight={wide ? 480 : 30} />
+        <div
+          className="pointer-events-none absolute inset-0 z-[500]"
+          style={{
+            background: wide
+              ? "linear-gradient(90deg, rgba(5,5,6,0.75), transparent 30%, transparent 62%, rgba(5,5,6,0.75)), linear-gradient(180deg, rgba(5,5,6,0.7), transparent 14%, transparent 86%, rgba(5,5,6,0.7))"
+              : "radial-gradient(ellipse at center, transparent 60%, rgba(5,5,6,0.45))",
+          }}
+        />
       </div>
-      <div className="space-y-5 lg:col-span-5">
-        <blockquote className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Your report</p>
-          <p className="text-pretty text-slate-100">“{turn.message}”</p>
-        </blockquote>
-        <Activity turn={turn} />
+      <div className="relative z-[600] min-[1100px]:absolute min-[1100px]:bottom-6 min-[1100px]:left-6 min-[1100px]:top-20 min-[1100px]:flex min-[1100px]:w-[380px] min-[1100px]:flex-col">
+        <AgentPanel turn={turn} />
       </div>
-      <div className="space-y-5 lg:col-span-7">
-        <div className="relative h-[340px] overflow-hidden rounded-2xl border border-white/10 lg:h-[420px]">
-          <JourneyMap data={data} />
-          <div className="pointer-events-none absolute left-3 top-3 z-[500] flex flex-wrap gap-2 text-[11px]">
-            <span className="rounded-full bg-black/60 px-2 py-0.5 text-slate-200">● you</span>
-            <span className="rounded-full bg-black/60 px-2 py-0.5 text-rose-300">✕ stations hit</span>
-            <span className="rounded-full bg-black/60 px-2 py-0.5 text-amber-300">★ escape hub</span>
-            <span className="rounded-full bg-black/60 px-2 py-0.5 text-emerald-300">━ detour</span>
-            <span className="rounded-full bg-black/60 px-2 py-0.5 text-emerald-300">⚑ destination</span>
-          </div>
-        </div>
-        {turn.plan ? (
-          <PlanCards plan={turn.plan} feeds={feeds} speak={turn.voice} />
-        ) : !turn.running && turn.text ? (
-          <section aria-label="Plan B needs one detail" className="rounded-2xl border border-amber-400/50 bg-amber-400/[0.08] p-5">
-            <p className="font-mono text-xs font-bold uppercase tracking-[0.2em] text-amber-300">One quick question</p>
-            <p className="mt-2 text-lg text-pretty text-white">{turn.text}</p>
-            <p className="mt-2 text-sm text-slate-400">Answer in the box above, by typing or with the mic.</p>
-          </section>
-        ) : turn.running ? (
-          <p className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-slate-500">
-            Plan A and Plan B appear here once every line is checked live…
-          </p>
-        ) : null}
-        {turn.plan && turn.text ? <p className="text-sm text-slate-300">{turn.text}</p> : null}
-        {turn.errors.length > 0 ? (
-          <div role="alert" className="space-y-1 rounded-xl bg-rose-500/10 p-3 text-sm text-rose-200">
-            {[...new Set(turn.errors)].slice(0, 3).map((e) => (
-              <p key={e}>Something went wrong: {e}. Try again in a moment.</p>
-            ))}
-          </div>
-        ) : null}
-        {turn.ms != null ? <p className="text-right font-mono text-xs tabular-nums text-slate-500">Done in {(turn.ms / 1000).toFixed(1)}&nbsp;s</p> : null}
+      <div className="relative z-[600] min-[1100px]:absolute min-[1100px]:right-6 min-[1100px]:top-20 min-[1100px]:flex min-[1100px]:max-h-[calc(100vh-104px)] min-[1100px]:w-[420px] min-[1100px]:flex-col">
+        <PlanPanel turn={turn} situation={situation} map={data} />
+      </div>
+      <div className="relative z-[600] flex justify-center min-[1100px]:absolute min-[1100px]:bottom-6 min-[1100px]:left-[428px] min-[1100px]:right-[468px]">
+        <FollowUp busy={busy} onSend={onSend} onVoice={onVoice} voiceReady={voiceReady} />
       </div>
     </div>
   );
 }
 
 export default function Home() {
-  const { turns, busy, send } = usePlanB();
+  const { turns, busy, send, reset } = usePlanB();
+  const onVoiceText = useCallback((text: string) => send(text, { voice: true }), [send]);
+  const voice = useVoiceInput(onVoiceText);
   const current = turns.at(-1);
+  const showVoice = voice.status === "listening" || voice.status === "transcribing" || voice.status === "error";
+  const startVoice = () => {
+    if (!busy) void voice.start();
+  };
+
   return (
-    <main className="pb-bg min-h-screen text-slate-100">
-      <div className="mx-auto max-w-[1400px] px-4 py-5 sm:px-6">
-        <Header />
-        <ReportsTicker />
-        {current ? (
-          <div className="space-y-5 pt-5">
-            <Composer busy={busy} onSend={send} followUp />
-            <Run key={turns.length} turn={current} />
-          </div>
-        ) : (
-          <Hero busy={busy} onSend={send} />
-        )}
-      </div>
-    </main>
+    <div className="relative min-h-screen overflow-hidden bg-[#050506] text-[#ededf0]">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(60rem_32rem_at_50%_-8rem,rgba(245,178,78,0.07),transparent_70%)]" />
+      <div className="pointer-events-none absolute inset-0 z-40 opacity-[0.07] mix-blend-overlay" style={{ backgroundImage: NOISE }} />
+      <Header onHome={reset} />
+      {current ? (
+        <Workspace key={turns.length} turn={current} busy={busy} onSend={send} onVoice={startVoice} voiceReady={voice.supported} />
+      ) : (
+        <Hero busy={busy} onSend={send} onVoice={startVoice} voiceReady={voice.supported} />
+      )}
+      {showVoice ? <VoiceOverlay status={voice.status} error={voice.error} onStop={voice.stop} onCancel={voice.cancel} /> : null}
+    </div>
   );
 }

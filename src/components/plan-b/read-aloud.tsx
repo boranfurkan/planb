@@ -59,13 +59,13 @@ export function ReadAloud({ plan, autoPlay }: { plan: Plan; autoPlay: boolean })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const label = { idle: "🔊 Read It to Me", loading: "Preparing voice…", playing: "■ Stop", error: "Voice unavailable, try again" }[status];
+  const label = { idle: "Read aloud", loading: "Preparing…", playing: "Stop", error: "Try again" }[status];
   return (
     <button
       type="button"
       onClick={play}
       disabled={status === "loading"}
-      className="rounded-full border border-white/15 px-3 py-1.5 text-xs text-slate-200 transition-colors hover:border-amber-400 hover:text-white focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:outline-none disabled:opacity-60"
+      className="h-[46px] rounded-full border border-white/[0.12] px-[18px] text-sm text-[#ededf0] transition-colors hover:bg-white/[0.06] focus-visible:ring-2 focus-visible:ring-[#f5b24e] focus-visible:outline-none disabled:opacity-60"
     >
       {label}
     </button>

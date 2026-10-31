@@ -1,13 +1,15 @@
 "use client";
-// What other Plan B travellers reported in the last few hours: often ahead of the official feeds.
+// What other Plan B travellers reported in the last few hours (often ahead of the official feeds), one at a time.
 import { useEffect, useState } from "react";
 
 type LiveReport = { where: string; what: string; minutesAgo: number };
 
 const POLL_MS = 8_000;
+const ROTATE_MS = 4_000;
 
 export function ReportsTicker() {
   const [reports, setReports] = useState<LiveReport[]>([]);
+  const [i, setI] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -22,28 +24,25 @@ export function ReportsTicker() {
       }
     };
     void load();
-    const id = setInterval(load, POLL_MS);
+    const poll = setInterval(load, POLL_MS);
+    const rotate = setInterval(() => setI((n) => n + 1), ROTATE_MS);
     return () => {
       alive = false;
-      clearInterval(id);
+      clearInterval(poll);
+      clearInterval(rotate);
     };
   }, []);
 
   if (reports.length === 0) return null;
+  const r = reports[i % reports.length];
   return (
-    <div role="status" aria-live="polite" className="mt-3 flex items-start gap-3 rounded-xl border border-rose-400/30 bg-rose-500/[0.08] px-3 py-2 text-sm">
-      <span className="mt-0.5 flex shrink-0 items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.15em] text-rose-300">
-        <span className="pb-pulse h-1.5 w-1.5 rounded-full bg-rose-400" aria-hidden="true" />
-        Traveller reports
+    <div role="status" aria-live="polite" className="flex max-w-full items-center gap-3 rounded-full border border-[rgba(255,90,110,0.18)] bg-[rgba(255,90,110,0.07)] px-4 py-[9px] text-[13px]">
+      <span className="pb-pulse h-1.5 w-1.5 flex-none rounded-full bg-[#ff5a6e] shadow-[0_0_8px_#ff5a6e]" aria-hidden="true" />
+      <span className="flex-none font-mono text-[10.5px] uppercase tracking-[0.16em] text-[#ff9aa6]">Travellers report</span>
+      <span className="truncate text-[#ededf0]">
+        <b className="font-medium">{r.where}</b> <span className="text-[#a7a9b0]">— {r.what}</span>
       </span>
-      <ul className="min-w-0 flex-1 space-y-0.5">
-        {reports.slice(0, 3).map((r, i) => (
-          <li key={`${r.where}-${i}`} className="truncate text-rose-50">
-            <span className="font-semibold">{r.where}</span>: {r.what}
-            <span className="ml-2 font-mono text-xs tabular-nums text-rose-300/80">{r.minutesAgo === 0 ? "just now" : `${r.minutesAgo} min ago`}</span>
-          </li>
-        ))}
-      </ul>
+      <span className="flex-none font-mono text-[11px] text-[#7c7f87]">{r.minutesAgo === 0 ? "just now" : `${r.minutesAgo} min`}</span>
     </div>
   );
 }

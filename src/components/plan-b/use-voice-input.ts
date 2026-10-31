@@ -10,6 +10,9 @@ const SILENCE_LEVEL = 0.025; // a busy venue is not silent: tap the mic to stop 
 const SILENCE_MS = 1400; // stop after this much quiet once speech has started
 const MAX_MS = 25_000;
 
+/** Live microphone level (0..1) for the orb; read every animation frame, so a plain mutable object. */
+export const voiceLevel = { current: 0.1 };
+
 const noSubscribe = () => () => {};
 const canRecord = () => typeof MediaRecorder !== "undefined" && Boolean(navigator.mediaDevices?.getUserMedia);
 
@@ -58,12 +61,20 @@ export function useVoiceInput(onFinal: (text: string) => void) {
   }, [onFinal]);
   useEffect(() => () => cleanup.current?.(), []);
 
+  const cancelled = useRef(false);
   const stop = useCallback(() => {
     if (recorder.current?.state === "recording") recorder.current.stop();
+  }, []);
+  /** Stop without transcribing. */
+  const cancel = useCallback(() => {
+    cancelled.current = true;
+    if (recorder.current?.state === "recording") recorder.current.stop();
+    setStatus("idle");
   }, []);
 
   const start = useCallback(async () => {
     if (recorder.current) return;
+    cancelled.current = false;
     setError(null);
     setTranscript("");
     let stream: MediaStream;
@@ -94,6 +105,7 @@ export function useVoiceInput(onFinal: (text: string) => void) {
       let sum = 0;
       for (const s of samples) sum += s * s;
       const rms = Math.sqrt(sum / samples.length);
+      voiceLevel.current = Math.min(1, rms * 9);
       const now = performance.now();
       if (rms > SPEECH_LEVEL) {
         heard = true;
@@ -108,6 +120,7 @@ export function useVoiceInput(onFinal: (text: string) => void) {
     frame = requestAnimationFrame(watch);
 
     cleanup.current = () => {
+      voiceLevel.current = 0.1;
       cancelAnimationFrame(frame);
       stream.getTracks().forEach((t) => t.stop());
       void audio.close();
@@ -117,7 +130,7 @@ export function useVoiceInput(onFinal: (text: string) => void) {
       cleanup.current?.();
       cleanup.current = null;
       recorder.current = null;
-      if (!heard) {
+      if (!heard || cancelled.current) {
         setStatus("idle");
         return;
       }
@@ -141,5 +154,5 @@ export function useVoiceInput(onFinal: (text: string) => void) {
     setStatus("listening");
   }, [stop]);
 
-  return { supported, status, transcript, error, start, stop };
+  return { supported, status, transcript, error, start, stop, cancel };
 }
