@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #05070d;
+  --foreground: #e2e8f0;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -12,15 +13,154 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--background);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  touch-action: manipulation;
+}
+
+/* Page backdrop: faint grid and a warm glow, like a station concourse at night. */
+.pb-bg {
+  background-image:
+    radial-gradient(60rem 30rem at 15% -10%, rgba(251, 191, 36, 0.09), transparent 60%),
+    radial-gradient(50rem 30rem at 100% 0%, rgba(56, 189, 248, 0.06), transparent 60%),
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size:
+    auto,
+    auto,
+    48px 48px,
+    48px 48px;
+}
+
+/* Departure-board digits. */
+.pb-board {
+  color: #fbbf24;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-shadow: 0 0 12px rgba(251, 191, 36, 0.45);
+}
+
+@keyframes pb-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+}
+.pb-pulse {
+  animation: pb-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pb-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.pb-rise {
+  animation: pb-rise 0.5s ease-out both;
+}
+.pb-rise:nth-child(2) {
+  animation-delay: 0.12s;
+}
+
+@keyframes pb-row {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.pb-row {
+  animation: pb-row 0.35s ease-out both;
+}
+
+/* Map pins and labels. */
+.leaflet-container {
+  background: #0b0f17;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+.pb-dark-tiles {
+  filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9) saturate(0.6);
+}
+.pb-pin {
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+.pb-pin-origin {
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  box-shadow:
+    0 0 0 4px rgba(255, 255, 255, 0.25),
+    0 0 18px rgba(255, 255, 255, 0.6);
+}
+.pb-pin-broken {
+  width: 18px;
+  height: 18px;
+  background: rgba(244, 63, 94, 0.9);
+  color: #fff;
+  box-shadow: 0 0 12px rgba(244, 63, 94, 0.6);
+}
+.pb-pin-hub {
+  width: 24px;
+  height: 24px;
+  background: #fbbf24;
+  color: #111827;
+  box-shadow: 0 0 18px rgba(251, 191, 36, 0.8);
+}
+.pb-pin-dest {
+  width: 24px;
+  height: 24px;
+  background: #34d399;
+  color: #052e1c;
+  box-shadow: 0 0 18px rgba(52, 211, 153, 0.7);
+}
+.pb-tip {
+  background: rgba(2, 6, 23, 0.85);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 600;
+}
+.pb-tip::before {
+  display: none;
+}
+.pb-tip-hub {
+  color: #fcd34d;
+}
+.pb-tip-dest {
+  color: #6ee7b7;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pb-pulse,
+  .pb-rise,
+  .pb-row {
+    animation: none;
+  }
 }
