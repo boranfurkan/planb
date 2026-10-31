@@ -141,8 +141,13 @@ export function useVoiceInput(onFinal: (text: string) => void) {
         if (!res.ok) throw new Error(await res.text());
         const { text } = (await res.json()) as { text: string };
         setTranscript(text);
-        setStatus("idle");
-        if (text.trim()) onFinalRef.current(text.trim());
+        if (text.trim()) {
+          setStatus("idle");
+          onFinalRef.current(text.trim());
+        } else {
+          setStatus("error");
+          setError("I didn’t catch that. Try again, or type it.");
+        }
       } catch {
         setStatus("error");
         setError("Couldn't transcribe that. Try again, or type it.");
