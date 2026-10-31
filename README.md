@@ -47,6 +47,7 @@ ADK features used, each for a reason:
 
 Voice: speak your situation (browser speech recognition, en-GB) and hear the plan (Gemini TTS, `gemini-3.8-flash-tts`, via `/api/speak`).
 Shared reports: `/api/reports` feeds the live ticker, so a second phone sees what the first traveller reported.
+Back to your maps app: "Open in Google Maps" hands the chosen plan over as Google Maps directions; a driving detour carries a waypoint on the detour, and a hub plan starts from the escape hub.
 
 ### London Live MCP server
 
