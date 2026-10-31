@@ -10,6 +10,8 @@
 
 **GitHub repository URL:** https://github.com/boranfurkan/planb
 
+**Live app:** https://planb-418588800928.europe-west2.run.app
+
 **Demo video URL:** (add after recording, max 3 minutes)
 
 **App purpose:**

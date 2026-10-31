@@ -2,6 +2,8 @@
 
 **When the station knows before the app does.**
 
+**Live:** https://planb-418588800928.europe-west2.run.app (Cloud Run, London)
+
 Last Sunday at Lee station, staff at the entrance said every train was cancelled because of the wind. Google Maps and Citymapper still routed me through Lee. I didn't know my options, so I guessed: a taxi to Lewisham, a bigger station with more lines. It worked, but I worked it out alone and late.
 
 Think of it as the "my situation isn't on the map yet" button your maps app is missing. When the apps are right, use the apps. Plan B is for the gap, on public transport or on the road, and when the official feeds catch up it uses them too.
