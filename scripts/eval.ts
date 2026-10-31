@@ -21,7 +21,8 @@ const SCENARIOS: Scenario[] = [
     checks: (t) => [
       ["records the report against southeastern", called(t, "report_disruption").some((c) => JSON.stringify(c.args).toLowerCase().includes("southeastern"))],
       ["scans stations with southeastern down", called(t, "nearby_stations").some((c) => JSON.stringify(c.args.avoid_lines ?? []).includes("southeastern"))],
-      ["three scouts ran", ["transit_scout", "hub_scout", "taxi_scout"].every((a) => t.calls.some((c) => c.agent === a))],
+      ["transit and hub scouts ran", ["transit_scout", "hub_scout"].every((a) => t.calls.some((c) => c.agent === a))],
+      ["no taxi all the way", !(t.plan?.options ?? []).some((o) => o.steps.length > 0 && o.steps.every((s) => /taxi|cab|walk/i.test(s.mode)))],
       ["presents a plan with at least two options", (t.plan?.options.length ?? 0) >= 2],
       ["Plan A avoids National Rail (weather)", !(firstOption(t.plan)?.steps ?? []).some((s) => /national-rail/i.test(s.mode))],
       ["no step rides Southeastern", !steps(t.plan).some((s) => /southeastern/i.test(s.text))],

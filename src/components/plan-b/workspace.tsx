@@ -28,7 +28,7 @@ function useElapsed(turn: Turn) {
 
 const STAGES: { name: string; who: string; agents: AgentName[] }[] = [
   { name: "Understanding your report", who: "Situation analyst", agents: ["situation_analyst"] },
-  { name: "Scouting a way out", who: "Four scouts, in parallel", agents: SCOUTS },
+  { name: "Scouting a way out", who: "Three scouts, in parallel", agents: SCOUTS },
   { name: "Verifying every line live", who: "Verifier loop", agents: ["verifier"] },
   { name: "Ranking your options", who: "Presenter", agents: ["presenter"] },
 ];

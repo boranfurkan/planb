@@ -8,13 +8,12 @@ export const AGENTS = {
   situation_analyst: { icon: "🧭", label: "Situation analyst", short: "Analyst", role: "Understands your report and what it knocks out" },
   transit_scout: { icon: "🚌", label: "Transit scout", short: "Transit", role: "Public transport around the problem" },
   hub_scout: { icon: "🔀", label: "Hub scout", short: "Hub", role: "Quick hop to an interchange that still works" },
-  taxi_scout: { icon: "🚕", label: "Taxi scout", short: "Taxi", role: "Door to door, the fallback" },
   road_scout: { icon: "🚗", label: "Road scout", short: "Road", role: "Drivers: detours around the incident" },
   verifier: { icon: "✅", label: "Verifier", short: "Verifier", role: "Live-checks every line, re-plans what fails" },
   presenter: { icon: "🗂️", label: "Presenter", short: "Presenter", role: "Ranks and explains" },
 } as const;
 export type AgentName = keyof typeof AGENTS;
-export const SCOUTS: AgentName[] = ["transit_scout", "hub_scout", "taxi_scout", "road_scout"];
+export const SCOUTS: AgentName[] = ["transit_scout", "hub_scout", "road_scout"];
 
 export const TOOL_ICON: Record<string, string> = {
   find_place: "📍",

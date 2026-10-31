@@ -20,10 +20,9 @@ A multi-agent system built with the **Google Agent Development Kit (ADK, TypeScr
 plan_b (SequentialAgent)
   1. situation_analyst        understands the report, locates places, records it for other travellers,
                               finds which nearby stations it knocks out and which interchanges still work
-  2. scouts (ParallelAgent)   three scouts look for a way out at the same time
+  2. scouts (ParallelAgent)   three scouts look for a way out at the same time (no "taxi all the way": everyone thinks of that)
        transit_scout          public transport straight from you, avoiding what is broken
        hub_scout              taxi hop to the best escape hub, then onward (with live departures)
-       taxi_scout             door to door, the fallback
        road_scout             drivers: detours around the incident (blocked route vs clear detours)
   3. verify_loop (LoopAgent)  live status of every line in every option; re-plans an option that fails
   4. presenter                ranks by deadline, reliability and cost; shows Plan A / Plan B
@@ -94,7 +93,7 @@ npx tsx scripts/run-agent.ts "I'm at Lee station, trains are cancelled because o
 
 | Scenario | Checks |
 |---|---|
-| Lee, trains cancelled by wind | report recorded against Southeastern; stations scanned with it down; all three scouts run; at least two options; Plan A avoids National Rail; no step rides Southeastern; the insight names an escape hub |
+| Lee, trains cancelled by wind | report recorded against Southeastern; stations scanned with it down; transit and hub scouts run; no taxi all the way; at least two options; Plan A avoids National Rail; no step rides Southeastern; the insight names an escape hub |
 | "I never take taxis" with Lewisham DLR closed | `remember_preference` called; a plan is presented; no option uses a taxi; nothing rides the closed DLR |
 | Driver: crash ahead on the A2 | road scout routes around the incident; TfL road feed checked; no public transport planned; a driving plan is presented |
 | Destination missing | no plan is guessed; the traveller is asked a question; scouts don't plan journeys |

@@ -6,7 +6,6 @@
 //     2. scouts (ParallelAgent)
 //          transit_scout     public transport straight from the origin, avoiding what is broken
 //          hub_scout         taxi or bus hop to the best escape hub, then onward
-//          taxi_scout        door to door, the fallback
 //          road_scout        drivers: detours around the incident they reported
 //     3. verifier (LoopAgent, max 2 rounds)  live-checks every line in every option, re-plans what fails
 //     4. presenter           Plan A / Plan B cards
@@ -264,21 +263,6 @@ Pick the hub that arrives earliest. ${OPTION_FORMAT}
 Use "kind":"hub" and include the taxi fare in cost.`,
 });
 
-const taxiScout = new LlmAgent({
-  beforeAgentCallback: forTransit,
-  name: "taxi_scout",
-  description: "Prices a taxi door to door as the fallback.",
-  model: SCOUT_MODEL,
-  generateContentConfig: CONFIG,
-  tools: [londonLive(["taxi_estimate"])],
-  outputKey: "taxi_option",
-  instruction: (ctx) => `You are the taxi scout in Plan B.
-${scoutPreamble(ctx)}
-If the constraints or remembered preferences rule out taxis, reply only {"skipped":true}.
-Otherwise call taxi_estimate from the origin to the destination once. ${OPTION_FORMAT}
-Use "kind":"taxi", one step, linesUsed [].`,
-});
-
 const roadScout = new LlmAgent({
   beforeAgentCallback: forDriving,
   name: "road_scout",
@@ -300,8 +284,8 @@ Reply with ONLY a JSON object, no prose, no code fences:
 
 const scouts = new ParallelAgent({
   name: "scouts",
-  description: "Four scouts look for different ways out at the same time.",
-  subAgents: [transitScout, hubScout, taxiScout, roadScout],
+  description: "Three scouts look for different ways out at the same time.",
+  subAgents: [transitScout, hubScout, roadScout],
 });
 
 // ---------- 3. verifier ----------
@@ -309,7 +293,7 @@ const scouts = new ParallelAgent({
 /** Before the verifier thinks, fetch the live status of every line the scouts used, in code. */
 async function gatherLiveStatus(ctx: Context) {
   const lines = new Set<string>();
-  for (const key of ["transit_option", "hub_option", "taxi_option", "road_option"]) {
+  for (const key of ["transit_option", "hub_option", "road_option"]) {
     const option = parseAgentJson<{ linesUsed?: string[] }>(ctx.state.get<string>(key));
     for (const l of option?.linesUsed ?? []) lines.add(String(l).toLowerCase());
   }
@@ -336,7 +320,6 @@ const checker = new LlmAgent({
 Situation: ${stateText(ctx, "situation")}
 Transit option: ${stateText(ctx, "transit_option")}
 Hub option: ${stateText(ctx, "hub_option")}
-Taxi option: ${stateText(ctx, "taxi_option")}
 Road option (drivers): ${stateText(ctx, "road_option")}
 Your previous check, if any: ${stateText(ctx, "verified")}
 
@@ -363,7 +346,9 @@ const presenter = new LlmAgent({
   instruction: (ctx) => `You are the presenter in Plan B. Current London time: ${londonNow()}.
 Situation: ${stateText(ctx, "situation")}
 Verified options: ${stateText(ctx, "verified")}
-Raw scout options, if the verifier skipped: transit ${stateText(ctx, "transit_option")} | hub ${stateText(ctx, "hub_option")} | taxi ${stateText(ctx, "taxi_option")} | road ${stateText(ctx, "road_option")}
+Raw scout options, if the verifier skipped: transit ${stateText(ctx, "transit_option")} | hub ${stateText(ctx, "hub_option")} | road ${stateText(ctx, "road_option")}
+Never offer a taxi all the way: everyone thinks of that already. For public transport, options are a short taxi or bus hop to an interchange
+that still works followed by public transport, or public transport all the way.
 For a driver, Plan A is the fastest clear detour and Plan B the next clear one (from the road option's alternatives); steps use mode "drive".
 
 If the situation contains "question", ask that question in one sentence and do not call any tool.
