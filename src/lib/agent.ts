@@ -7,6 +7,7 @@
 //          transit_scout     public transport straight from the origin, avoiding what is broken
 //          hub_scout         taxi or bus hop to the best escape hub, then onward
 //          taxi_scout        door to door, the fallback
+//          road_scout        drivers: detours around the incident they reported
 //     3. verifier (LoopAgent, max 2 rounds)  live-checks every line in every option, re-plans what fails
 //     4. presenter           Plan A / Plan B cards
 import {
@@ -27,6 +28,7 @@ import {
 import { type GenerateContentConfig, ThinkingLevel } from "@google/genai";
 import { z } from "zod";
 import { parseAgentJson } from "./agent-json";
+import type { Situation } from "./plan-types";
 import { addReport, recentReports } from "./reports";
 import { lineStatus } from "./tfl";
 
@@ -162,7 +164,7 @@ const situationAnalyst = new LlmAgent({
   description: "Understands the traveller's report, locates places, records the report and finds escape hubs.",
   model: MODEL,
   generateContentConfig: CONFIG,
-  tools: [londonLive(["find_place", "nearby_stations", "line_status"]), reportDisruption, recentReportsTool, rememberPreference],
+  tools: [londonLive(["find_place", "nearby_stations", "line_status", "road_disruptions"]), reportDisruption, recentReportsTool, rememberPreference],
   outputKey: "situation",
   instruction: (ctx) => `You are the situation analyst in Plan B, a London travel agent for the moment journey apps are behind reality.
 Current London time: ${londonNow()}.
@@ -174,7 +176,16 @@ the traveller is in London, so prefer the London station that sounds alike rathe
 The traveller reports something the apps may not know yet, like "staff at Lee say trains are cancelled because of the wind".
 Treat it as true even when official feeds say Good Service. Use the whole conversation: a follow-up like "I can't afford a taxi" changes the constraints.
 
-Do this with tools:
+First decide the mode: "driving" if they are in a car, on a road, in traffic, or mention a junction, lane or motorway; otherwise "transit".
+A message may include "My location: lat, lon": that is where they are now (find_place resolves it).
+
+If the mode is DRIVING, do this with tools, then skip to the JSON:
+a. find_place for where they are, where they are going, and where the incident is (e.g. "Shooters Hill Road, Blackheath"), in parallel.
+   If they don't name the incident's place, it is just ahead of them: use their position.
+b. report_disruption (lines: [] or the road, e.g. ["a2"]) and recent_reports, in parallel.
+c. road_disruptions at the incident: does TfL's official road feed already show it? That sets officialFeedShowsIt.
+
+If the mode is TRANSIT:
 1. find_place for the origin and the destination (add "station" for stations).
 2. If the traveller reports a disruption: report_disruption with the lines it affects (a London suburban station like Lee is usually Southeastern;
    if unsure, call nearby_stations first). Call recent_reports at the same time.
@@ -185,18 +196,31 @@ Do this with tools:
 4. line_status for the broken lines: note whether the official feed already shows it.
 
 Then reply with ONLY a JSON object, no prose, no code fences:
-{"origin":{"name","lat","lon"},"destination":{"name","lat","lon"},"now":"HH:MM","deadline":"HH:MM or null",
+{"mode":"transit or driving","origin":{"name","lat","lon"},"destination":{"name","lat","lon"},"incident":{"name","lat","lon"} (driving only),
+ "now":"HH:MM","deadline":"HH:MM or null",
  "broken":{"lines":[],"stations":[],"cause":"","weatherOrInfrastructure":true},"officialFeedShowsIt":false,
  "escapeHubs":[{"name","lat","lon","stopIds":[],"workingLines":[],"distanceKm":0}],
  "constraints":["e.g. no taxi","budget £15","step-free"],"otherReports":["..."]}
-Keep at most 2 escape hubs, the best first. If the origin or destination is missing, reply {"question":"<one short question>"} instead.`,
+Keep at most 2 escape hubs, the best first (none when driving). If the origin or destination is missing, reply {"question":"<one short question>"} instead.`,
 });
 
 // ---------- 2. scouts ----------
 
+/** Scouts that don't apply (a driver doesn't need the Tube, a commuter doesn't need detours) are skipped in code, without a model call. */
+function onlyWhen(applies: (situation: Situation) => boolean) {
+  return (ctx: Context) => {
+    const situation = parseAgentJson<Situation>(ctx.state.get<string>("situation")) ?? {};
+    if (!situation.question && applies(situation)) return undefined;
+    return { role: "model", parts: [{ text: '{"skipped":true}' }] };
+  };
+}
+const forTransit = onlyWhen((s) => s.mode !== "driving");
+const forDriving = onlyWhen((s) => s.mode === "driving");
+
 const scoutPreamble = (ctx: ReadonlyContext) => `Current London time: ${londonNow()}.
 The situation, as JSON: ${stateText(ctx, "situation")}
 If the situation contains "question", reply only {"skipped":true}.
+If the situation's mode is "driving", reply only {"skipped":true}: the road scout handles drivers.
 Never guess lines, times or fares: use tool results only. from/to for plan_journey are "lat,lon".`;
 
 const OPTION_FORMAT = `Reply with ONLY a JSON object, no prose, no code fences:
@@ -204,6 +228,7 @@ const OPTION_FORMAT = `Reply with ONLY a JSON object, no prose, no code fences:
  "linesUsed":["261","dlr"],"liveIssues":["..."],"notes":"..."}`;
 
 const transitScout = new LlmAgent({
+  beforeAgentCallback: forTransit,
   name: "transit_scout",
   description: "Finds the best public transport route straight from the origin, avoiding what is broken.",
   model: SCOUT_MODEL,
@@ -220,6 +245,7 @@ Use "kind":"direct".`,
 });
 
 const hubScout = new LlmAgent({
+  beforeAgentCallback: forTransit,
   name: "hub_scout",
   description: "Gets the traveller to the best escape hub by taxi, then plans onward from there.",
   model: SCOUT_MODEL,
@@ -239,6 +265,7 @@ Use "kind":"hub" and include the taxi fare in cost.`,
 });
 
 const taxiScout = new LlmAgent({
+  beforeAgentCallback: forTransit,
   name: "taxi_scout",
   description: "Prices a taxi door to door as the fallback.",
   model: SCOUT_MODEL,
@@ -252,10 +279,29 @@ Otherwise call taxi_estimate from the origin to the destination once. ${OPTION_F
 Use "kind":"taxi", one step, linesUsed [].`,
 });
 
+const roadScout = new LlmAgent({
+  beforeAgentCallback: forDriving,
+  name: "road_scout",
+  description: "For drivers: routes around the incident they reported.",
+  model: SCOUT_MODEL,
+  generateContentConfig: CONFIG,
+  tools: [londonLive(["drive_routes"])],
+  outputKey: "road_option",
+  instruction: (ctx) => `You are the road scout in Plan B.
+Current London time: ${londonNow()}.
+The situation, as JSON: ${stateText(ctx, "situation")}
+If the situation contains "question", or its mode is not "driving", reply only {"skipped":true}.
+Otherwise call drive_routes once from the origin to the destination with the incident position (radius_m 150).
+Pick the fastest route with passesIncident false; mention the blocked direct route and how much time the detour costs.
+Reply with ONLY a JSON object, no prose, no code fences:
+{"kind":"drive","title":"Detour via <main roads>","leaveAt":"HH:MM","arriveBy":"HH:MM","totalMinutes":0,"cost":"","steps":[{"mode":"drive","text":"Leave Shooters Hill Road before the crash: turn onto Blackheath Park","minutes":5}],
+ "linesUsed":[],"liveIssues":["Direct route via A2 passes the crash (151 m)"],"alternatives":[{"title":"...","totalMinutes":0}],"notes":"..."}`,
+});
+
 const scouts = new ParallelAgent({
   name: "scouts",
-  description: "Three scouts look for different ways out at the same time.",
-  subAgents: [transitScout, hubScout, taxiScout],
+  description: "Four scouts look for different ways out at the same time.",
+  subAgents: [transitScout, hubScout, taxiScout, roadScout],
 });
 
 // ---------- 3. verifier ----------
@@ -263,7 +309,7 @@ const scouts = new ParallelAgent({
 /** Before the verifier thinks, fetch the live status of every line the scouts used, in code. */
 async function gatherLiveStatus(ctx: Context) {
   const lines = new Set<string>();
-  for (const key of ["transit_option", "hub_option", "taxi_option"]) {
+  for (const key of ["transit_option", "hub_option", "taxi_option", "road_option"]) {
     const option = parseAgentJson<{ linesUsed?: string[] }>(ctx.state.get<string>(key));
     for (const l of option?.linesUsed ?? []) lines.add(String(l).toLowerCase());
   }
@@ -291,6 +337,7 @@ Situation: ${stateText(ctx, "situation")}
 Transit option: ${stateText(ctx, "transit_option")}
 Hub option: ${stateText(ctx, "hub_option")}
 Taxi option: ${stateText(ctx, "taxi_option")}
+Road option (drivers): ${stateText(ctx, "road_option")}
 Your previous check, if any: ${stateText(ctx, "verified")}
 
 Live status of every line the options use, fetched just now: ${stateText(ctx, "live_status")}
@@ -316,7 +363,8 @@ const presenter = new LlmAgent({
   instruction: (ctx) => `You are the presenter in Plan B. Current London time: ${londonNow()}.
 Situation: ${stateText(ctx, "situation")}
 Verified options: ${stateText(ctx, "verified")}
-Raw scout options, if the verifier skipped: transit ${stateText(ctx, "transit_option")} | hub ${stateText(ctx, "hub_option")} | taxi ${stateText(ctx, "taxi_option")}
+Raw scout options, if the verifier skipped: transit ${stateText(ctx, "transit_option")} | hub ${stateText(ctx, "hub_option")} | taxi ${stateText(ctx, "taxi_option")} | road ${stateText(ctx, "road_option")}
+For a driver, Plan A is the fastest clear detour and Plan B the next clear one (from the road option's alternatives); steps use mode "drive".
 
 If the situation contains "question", ask that question in one sentence and do not call any tool.
 Otherwise rank by: arrives before the deadline, then reliability (fewer changes, no disrupted legs), then cost.

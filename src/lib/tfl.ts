@@ -51,8 +51,27 @@ const KNOWN: Record<string, Place> = {
 
 const POSTCODE = /^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$/i;
 
+const COORDS = /(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)/;
+
 export async function findPlace(query: string): Promise<Place[]> {
   const q = query.trim();
+
+  // The traveller's own GPS position ("51.4497, 0.0135"): name it with a reverse lookup.
+  const c = COORDS.exec(q);
+  if (c) {
+    const lat = Number(c[1]);
+    const lon = Number(c[2]);
+    try {
+      const r = await getJson<{ display_name?: string; address?: Record<string, string> }>(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=17&lat=${lat}&lon=${lon}`,
+      );
+      const a = r.address ?? {};
+      const name = [a.road, a.suburb ?? a.neighbourhood ?? a.town].filter(Boolean).join(", ") || r.display_name?.split(",").slice(0, 2).join(",");
+      return [{ name: `Your location: ${name ?? "current position"}`, lat, lon, source: "gps" }];
+    } catch {
+      return [{ name: "Your location", lat, lon, source: "gps" }];
+    }
+  }
   for (const [k, p] of Object.entries(KNOWN)) if (q.toLowerCase().includes(k)) return [p];
 
   const pc = q.match(/[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}/i)?.[0];

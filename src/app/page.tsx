@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { Activity } from "@/components/plan-b/activity";
 import { BoardClock } from "@/components/plan-b/board-clock";
 import { Composer, type SendOptions } from "@/components/plan-b/composer";
-import { affectedStations, knownPlaces } from "@/components/plan-b/format";
+import { affectedStations, driveRoutesFor, knownPlaces } from "@/components/plan-b/format";
 import type { MapData } from "@/components/plan-b/journey-map";
 import { Pipeline } from "@/components/plan-b/pipeline";
 import { PhoneQr } from "@/components/plan-b/phone-qr";
@@ -21,11 +21,14 @@ const JourneyMap = dynamic(() => import("@/components/plan-b/journey-map"), {
 
 function mapData(turn: Turn, situation?: Situation): MapData {
   const places = knownPlaces(turn.calls.filter((c) => c.name === "find_place"));
+  const drive = driveRoutesFor(turn.calls);
   return {
     origin: situation?.origin ?? places[0],
     destination: situation?.destination ?? places[1],
     hubs: (situation?.escapeHubs ?? []).filter((h) => typeof h.lat === "number").slice(0, 2),
     affected: affectedStations(turn.calls),
+    incident: drive.incident ?? (situation?.mode === "driving" ? situation.incident : undefined),
+    routes: drive.routes,
   };
 }
 
@@ -50,23 +53,63 @@ function Header() {
   );
 }
 
+const STEPS = [
+  { icon: "🗣️", title: "Tell it what you see", text: "“Staff say every train is cancelled.” “A lorry has blocked the road ahead.” Type it, or just say it." },
+  {
+    icon: "🤖",
+    title: "Six agents re-plan around it",
+    text: "They work out what your report knocks out, find a way round on a network or road that still works, and check every line live.",
+  },
+  { icon: "📣", title: "The next person is warned", text: "Your report is shared with other travellers before the official feeds catch up." },
+];
+
 function Hero({ busy, onSend }: { busy: boolean; onSend: (t: string, opts?: SendOptions) => void }) {
   return (
-    <section className="mx-auto max-w-3xl py-16 text-center sm:py-24">
-      <p className="mb-4 font-mono text-xs uppercase tracking-[0.3em] text-amber-300/80">Lee station · Sunday morning · trains cancelled</p>
-      <h1 className="text-4xl font-black tracking-tight text-balance text-white sm:text-6xl">
-        Your station just closed.
-        <br />
-        <span className="text-amber-400">The apps don’t know yet.</span>
-      </h1>
-      <p className="mx-auto mt-5 max-w-xl text-base text-pretty text-slate-400 sm:text-lg">
-        Tell Plan B what the staff just told you, or just say it. Six AI agents check live London data, find the nearest interchange that still works, and get you
-        moving.
-      </p>
-      <div className="mt-8 text-left">
+    <section className="mx-auto max-w-4xl py-12 sm:py-16">
+      <div className="text-center">
+        <p className="mb-4 font-mono text-xs uppercase tracking-[0.3em] text-amber-300/80">A “my situation isn’t on the map yet” button for your maps app</p>
+        <h1 className="text-4xl font-black tracking-tight text-balance text-white sm:text-6xl">
+          Your station just closed.
+          <br />
+          <span className="text-amber-400">The apps don’t know yet.</span>
+        </h1>
+        <p className="mx-auto mt-5 max-w-2xl text-base text-pretty text-slate-400 sm:text-lg">
+          Google Maps and Citymapper run on official feeds, and feeds lag behind the staff at the gate or the crash in front of you. Tell Plan B what you
+          see, and its agents re-plan around it with live London data.
+        </p>
+      </div>
+      <div className="mx-auto mt-8 max-w-3xl">
         <Composer busy={busy} onSend={onSend} followUp={false} />
       </div>
-      <p className="mt-6 text-xs text-slate-500">Google ADK multi-agent · Gemini on Vertex AI · London Live MCP server · TfL Unified API</p>
+
+      <div className="mt-10 grid gap-3 sm:grid-cols-3">
+        {STEPS.map((s, i) => (
+          <div key={s.title} className="rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+            <p className="font-mono text-xs text-amber-300/80">0{i + 1}</p>
+            <p className="mt-1 font-semibold text-white">
+              <span aria-hidden="true">{s.icon} </span>
+              {s.title}
+            </p>
+            <p className="mt-1 text-sm text-pretty text-slate-400">{s.text}</p>
+          </div>
+        ))}
+      </div>
+
+      <figure className="mt-6 rounded-2xl border border-amber-400/25 bg-amber-400/[0.05] p-5">
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-amber-300">Why it exists · Sunday 25 October · Lee station</p>
+        <blockquote className="mt-2 text-pretty text-slate-200">
+          “Staff at the entrance said every train was cancelled because of the wind. Google Maps still told me to take the train from Lee. I didn’t know
+          my options, so I guessed: an Uber to Lewisham, a bigger station with more lines. It worked, but I worked it out alone, and late. Plan B is the
+          agent I wanted.”
+        </blockquote>
+      </figure>
+
+      <p className="mt-6 text-center text-sm text-slate-400">
+        When the apps are right, use the apps. <span className="text-white">Plan B is for the gap</span>, and when the feeds catch up it uses them too.
+      </p>
+      <p className="mt-2 text-center text-xs text-slate-500">
+        🚆 Trains, Tube, DLR &amp; Overground · 🚌 Buses · 🚗 Driving · Google ADK multi-agent · Gemini on Vertex AI · London Live MCP server
+      </p>
     </section>
   );
 }
@@ -74,7 +117,7 @@ function Hero({ busy, onSend }: { busy: boolean; onSend: (t: string, opts?: Send
 function Run({ turn }: { turn: Turn }) {
   const situation = parseAgentJson<Situation>(turn.outputs.situation_analyst);
   const data = mapData(turn, situation);
-  const aheadOfFeeds = situation?.officialFeedShowsIt === false;
+  const feeds = situation?.officialFeedShowsIt === false ? "ahead" : situation?.officialFeedShowsIt === true ? "confirmed" : "unknown";
   return (
     <div className="grid gap-5 lg:grid-cols-12">
       <div className="lg:col-span-12">
@@ -94,11 +137,12 @@ function Run({ turn }: { turn: Turn }) {
             <span className="rounded-full bg-black/60 px-2 py-0.5 text-slate-200">● you</span>
             <span className="rounded-full bg-black/60 px-2 py-0.5 text-rose-300">✕ stations hit</span>
             <span className="rounded-full bg-black/60 px-2 py-0.5 text-amber-300">★ escape hub</span>
+            <span className="rounded-full bg-black/60 px-2 py-0.5 text-emerald-300">━ detour</span>
             <span className="rounded-full bg-black/60 px-2 py-0.5 text-emerald-300">⚑ destination</span>
           </div>
         </div>
         {turn.plan ? (
-          <PlanCards plan={turn.plan} aheadOfFeeds={aheadOfFeeds} speak={turn.voice} />
+          <PlanCards plan={turn.plan} feeds={feeds} speak={turn.voice} />
         ) : !turn.running && turn.text ? (
           <section aria-label="Plan B needs one detail" className="rounded-2xl border border-amber-400/50 bg-amber-400/[0.08] p-5">
             <p className="font-mono text-xs font-bold uppercase tracking-[0.2em] text-amber-300">One quick question</p>

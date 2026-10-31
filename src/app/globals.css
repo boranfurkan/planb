@@ -147,6 +147,14 @@ body {
 .pb-tip::before {
   display: none;
 }
+.pb-pin-incident {
+  width: 22px;
+  height: 22px;
+  font-size: 13px;
+}
+.pb-tip-incident {
+  color: #fda4af;
+}
 .pb-tip-hub {
   color: #fcd34d;
 }

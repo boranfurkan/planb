@@ -9,11 +9,12 @@ export const AGENTS = {
   transit_scout: { icon: "🚌", label: "Transit scout", short: "Transit", role: "Public transport around the problem" },
   hub_scout: { icon: "🔀", label: "Hub scout", short: "Hub", role: "Quick hop to an interchange that still works" },
   taxi_scout: { icon: "🚕", label: "Taxi scout", short: "Taxi", role: "Door to door, the fallback" },
+  road_scout: { icon: "🚗", label: "Road scout", short: "Road", role: "Drivers: detours around the incident" },
   verifier: { icon: "✅", label: "Verifier", short: "Verifier", role: "Live-checks every line, re-plans what fails" },
   presenter: { icon: "🗂️", label: "Presenter", short: "Presenter", role: "Ranks and explains" },
 } as const;
 export type AgentName = keyof typeof AGENTS;
-export const SCOUTS: AgentName[] = ["transit_scout", "hub_scout", "taxi_scout"];
+export const SCOUTS: AgentName[] = ["transit_scout", "hub_scout", "taxi_scout", "road_scout"];
 
 export const TOOL_ICON: Record<string, string> = {
   find_place: "📍",
@@ -26,6 +27,8 @@ export const TOOL_ICON: Record<string, string> = {
   recent_reports: "👥",
   exit_loop: "🏁",
   remember_preference: "🧠",
+  drive_routes: "🛣️",
+  road_disruptions: "🚧",
 };
 
 export const MODE_ICON: Record<string, string> = {
@@ -39,6 +42,8 @@ export const MODE_ICON: Record<string, string> = {
   "elizabeth-line": "🚆",
   "national-rail": "🚆",
   tram: "🚊",
+  drive: "🚗",
+  car: "🚗",
 };
 
 const COORD = /^\s*(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)\s*$/;
@@ -163,6 +168,25 @@ export function describe(call: ToolCall, known: LatLon[]): { title: string; deta
       return { title: "Every option checked" };
     case "remember_preference":
       return { title: `Remembering for next time: ${a.preference}` };
+    case "drive_routes": {
+      const d = r as { routes?: { kind: string; minutes: number; passesIncident: boolean; via: string[] }[] } | undefined;
+      return {
+        title: `Driving routes ${placeName(`${a.from_lat},${a.from_lon}`, known)} → ${placeName(`${a.to_lat},${a.to_lon}`, known)}${a.incident_lat !== undefined ? " around the incident" : ""}`,
+        detail:
+          err ??
+          d?.routes
+            ?.map((x) => `${x.passesIncident ? "✕ blocked" : "✓ clear"} ${x.minutes} min via ${x.via.slice(0, 2).join(", ")}`)
+            .join(" · "),
+      };
+    }
+    case "road_disruptions": {
+      const d = r as { officialDisruptionsNearby?: { where?: string; distanceM: number }[] } | undefined;
+      const n = d?.officialDisruptionsNearby ?? [];
+      return {
+        title: "Checking TfL's official road feed",
+        detail: err ?? (d ? (n.length ? `${n.length} known nearby, closest: ${n[0].where} (${n[0].distanceM} m)` : "Nothing reported here yet") : undefined),
+      };
+    }
     default:
       return { title: call.name, detail: typeof r === "string" ? r.slice(0, 160) : undefined };
   }
@@ -181,6 +205,26 @@ export function conclusion(text?: string): string | undefined {
 }
 
 /** Stations near the origin that the reported problem knocks out (for the map). */
+export type MapRoute = { path: [number, number][]; blocked: boolean; best: boolean };
+
+/** Driving routes from the latest drive_routes call: the blocked one and the clear detours (for the map). */
+export function driveRoutesFor(calls: ToolCall[]): { routes: MapRoute[]; incident?: LatLon } {
+  for (let i = calls.length - 1; i >= 0; i--) {
+    const c = calls[i];
+    if (c.name !== "drive_routes" || c.result === undefined) continue;
+    const r = unwrap(c.result) as { routes?: { path: [number, number][]; passesIncident: boolean }[]; incident?: { lat: number; lon: number } } | undefined;
+    if (!r?.routes) continue;
+    let bestTaken = false;
+    const routes = r.routes.map((x) => {
+      const best = !x.passesIncident && !bestTaken;
+      if (best) bestTaken = true;
+      return { path: x.path, blocked: x.passesIncident, best };
+    });
+    return { routes, incident: r.incident ? { name: "Incident", ...r.incident } : undefined };
+  }
+  return { routes: [] };
+}
+
 export function affectedStations(calls: ToolCall[]): LatLon[] {
   for (const t of calls) {
     if (t.name !== "nearby_stations" || !Array.isArray(t.args?.avoid_lines)) continue;

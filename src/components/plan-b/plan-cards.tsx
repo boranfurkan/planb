@@ -50,7 +50,24 @@ function Ticket({ option, primary }: { option: PlanOption; primary: boolean }) {
   );
 }
 
-export function PlanCards({ plan, aheadOfFeeds, speak }: { plan: Plan; aheadOfFeeds: boolean; speak: boolean }) {
+export type FeedsState = "ahead" | "confirmed" | "unknown";
+
+function FeedsBadge({ feeds }: { feeds: FeedsState }) {
+  if (feeds === "unknown") return null;
+  return feeds === "ahead" ? (
+    <p className="mb-2 inline-flex items-center gap-2 rounded-full bg-rose-500/15 px-3 py-1 text-xs font-medium text-rose-200 ring-1 ring-rose-400/30">
+      <span className="pb-pulse h-1.5 w-1.5 rounded-full bg-rose-400" aria-hidden="true" />
+      Ahead of the official feeds: planned from your report
+    </p>
+  ) : (
+    <p className="mb-2 inline-flex items-center gap-2 rounded-full bg-sky-500/15 px-3 py-1 text-xs font-medium text-sky-200 ring-1 ring-sky-400/30">
+      <span className="h-1.5 w-1.5 rounded-full bg-sky-400" aria-hidden="true" />
+      Official feeds confirm it: planned with your report and live data
+    </p>
+  );
+}
+
+export function PlanCards({ plan, feeds, speak }: { plan: Plan; feeds: FeedsState; speak: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -60,12 +77,7 @@ export function PlanCards({ plan, aheadOfFeeds, speak }: { plan: Plan; aheadOfFe
   return (
     <section ref={ref} aria-label="Your Plan B" className="scroll-mt-6 space-y-4">
       <div>
-        {aheadOfFeeds ? (
-          <p className="mb-2 inline-flex items-center gap-2 rounded-full bg-rose-500/15 px-3 py-1 text-xs font-medium text-rose-200 ring-1 ring-rose-400/30">
-            <span className="pb-pulse h-1.5 w-1.5 rounded-full bg-rose-400" aria-hidden="true" />
-            Official feeds don’t show this yet: planned from your report
-          </p>
-        ) : null}
+        <FeedsBadge feeds={feeds} />
         <h2 className="text-2xl font-bold text-balance text-white sm:text-3xl">{plan.headline}</h2>
         <div className="mt-1 flex flex-wrap items-center gap-3">
           <p className="min-w-0 flex-1 text-sm text-pretty text-slate-400">{plan.understood}</p>

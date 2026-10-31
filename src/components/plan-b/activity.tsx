@@ -9,6 +9,7 @@ const CHIP: Record<AgentName, string> = {
   transit_scout: "bg-violet-400/15 text-violet-300",
   hub_scout: "bg-amber-400/15 text-amber-300",
   taxi_scout: "bg-orange-400/15 text-orange-300",
+  road_scout: "bg-cyan-400/15 text-cyan-300",
   verifier: "bg-emerald-400/15 text-emerald-300",
   presenter: "bg-fuchsia-400/15 text-fuchsia-300",
 };

@@ -31,6 +31,8 @@ export type LatLon = { name: string; lat: number; lon: number };
 
 /** The situation analyst's conclusion (its JSON output). */
 export type Situation = {
+  mode?: "transit" | "driving";
+  incident?: LatLon;
   origin?: LatLon;
   destination?: LatLon;
   now?: string;

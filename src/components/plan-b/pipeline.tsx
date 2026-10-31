@@ -4,7 +4,7 @@ import type { Turn } from "./use-plan-b";
 
 type NodeState = "idle" | "active" | "done";
 
-const ORDER: AgentName[] = ["situation_analyst", "transit_scout", "hub_scout", "taxi_scout", "verifier", "presenter"];
+const ORDER: AgentName[] = ["situation_analyst", "transit_scout", "hub_scout", "taxi_scout", "road_scout", "verifier", "presenter"];
 
 function nodeState(name: AgentName, turn: Turn): NodeState {
   const seen = turn.agents.includes(name);
@@ -59,7 +59,7 @@ export function Pipeline({ turn }: { turn: Turn }) {
           <AgentNode name="situation_analyst" turn={turn} />
         </div>
         <Arrow lit={lit("transit_scout")} />
-        <div className="grid gap-1.5 rounded-xl border border-dashed border-amber-400/20 p-1.5 lg:flex-[1.6] lg:grid-cols-3">
+        <div className="grid gap-1.5 rounded-xl border border-dashed border-amber-400/20 p-1.5 lg:flex-[2.2] grid-cols-2 lg:grid-cols-4">
           {SCOUTS.map((s) => (
             <AgentNode key={s} name={s} turn={turn} />
           ))}

@@ -5,9 +5,9 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useEffect, useMemo, useRef } from "react";
 import type { LatLon } from "@/lib/plan-types";
-import { shortStation } from "./format";
+import { type MapRoute, shortStation } from "./format";
 
-export type MapData = { origin?: LatLon; destination?: LatLon; hubs: LatLon[]; affected: LatLon[] };
+export type MapData = { origin?: LatLon; destination?: LatLon; hubs: LatLon[]; affected: LatLon[]; incident?: LatLon; routes: MapRoute[] };
 
 const LONDON: L.LatLngTuple = [51.505, -0.09];
 const DARK_TILES = "invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9) saturate(0.6)";
@@ -54,7 +54,18 @@ export default function JourneyMap({ data }: { data: MapData }) {
         .addTo(g);
       pts.push([s.lat, s.lon]);
     }
-    if (d.origin) {
+    for (const r of d.routes) {
+      if (r.path.length < 2) continue;
+      L.polyline(r.path, r.blocked ? { color: "#f43f5e", weight: 4, dashArray: "4 8", opacity: 0.8 } : { color: "#34d399", weight: r.best ? 6 : 3, opacity: r.best ? 0.95 : 0.45 }).addTo(g);
+      for (const p of r.path) pts.push(p);
+    }
+    if (d.incident) {
+      L.marker([d.incident.lat, d.incident.lon], { icon: pin("pb-pin-broken pb-pin-incident", "!") })
+        .bindTooltip("Reported incident", { permanent: true, direction: "top", className: "pb-tip pb-tip-incident" })
+        .addTo(g);
+      pts.push([d.incident.lat, d.incident.lon]);
+    }
+    if (d.origin && d.routes.length === 0) {
       for (const h of d.hubs) {
         L.polyline(
           [
@@ -65,7 +76,7 @@ export default function JourneyMap({ data }: { data: MapData }) {
         ).addTo(g);
       }
     }
-    if (d.destination && d.hubs[0]) {
+    if (d.destination && d.hubs[0] && d.routes.length === 0) {
       L.polyline(
         [
           [d.hubs[0].lat, d.hubs[0].lon],

@@ -2,6 +2,7 @@
 // The Plan B agent reaches every live-data tool through this server; any other MCP client can use it too.
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { driveRoutes, roadDisruptions } from "./roads";
 import { arrivals, findPlace, lineStatus, nearbyStations, planJourney, taxiEstimate } from "./tfl";
 
 const ok = (data: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(data) }] });
@@ -95,6 +96,37 @@ export function createLondonLiveServer() {
     wrap(({ from_lat, from_lon, to_lat, to_lon }: { from_lat: number; from_lon: number; to_lat: number; to_lon: number }) =>
       taxiEstimate({ lat: from_lat, lon: from_lon }, { lat: to_lat, lon: to_lon }),
     ),
+  );
+
+  server.registerTool(
+    "drive_routes",
+    {
+      description:
+        "Driving routes between two points. If the driver reports an incident (crash, flooding, closure) give its position: routes passing within radius_m of it are marked passesIncident, and detours around it are built. Returns up to 3 routes with minutes (London traffic), km, main roads and clearance from the incident.",
+      inputSchema: {
+        from_lat: z.number(),
+        from_lon: z.number(),
+        to_lat: z.number(),
+        to_lon: z.number(),
+        incident_lat: z.number().optional(),
+        incident_lon: z.number().optional(),
+        radius_m: z.number().optional().describe("How close counts as going through the incident, default 150"),
+      },
+    },
+    wrap(async (a: { from_lat: number; from_lon: number; to_lat: number; to_lon: number; incident_lat?: number; incident_lon?: number; radius_m?: number }) => {
+      const incident = a.incident_lat !== undefined && a.incident_lon !== undefined ? { lat: a.incident_lat, lon: a.incident_lon } : undefined;
+      return driveRoutes({ lat: a.from_lat, lon: a.from_lon }, { lat: a.to_lat, lon: a.to_lon }, incident, a.radius_m ?? 150);
+    }),
+  );
+
+  server.registerTool(
+    "road_disruptions",
+    {
+      description:
+        "What TfL's official road-disruption feed already shows near a point (works, closures, collisions). Use it to tell whether the driver's report is already known to official feeds.",
+      inputSchema: { lat: z.number(), lon: z.number(), radius_m: z.number().optional().describe("Default 1500") },
+    },
+    wrap(({ lat, lon, radius_m }: { lat: number; lon: number; radius_m?: number }) => roadDisruptions({ lat, lon }, radius_m ?? 1500)),
   );
 
   return server;

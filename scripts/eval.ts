@@ -39,6 +39,16 @@ const SCENARIOS: Scenario[] = [
     ],
   },
   {
+    name: "Driver: crash ahead on the A2",
+    message: "I'm driving on Shooters Hill Road in Blackheath, heading to the O2. A lorry has crashed just ahead and blocked both lanes. I need to be at the O2 in 40 minutes.",
+    checks: (t) => [
+      ["road scout asked for routes around the incident", called(t, "drive_routes").some((c) => c.args.incident_lat !== undefined)],
+      ["official road feed checked", called(t, "road_disruptions").length > 0],
+      ["no public transport planned for a driver", called(t, "plan_journey").length === 0],
+      ["presents a driving plan", (firstOption(t.plan)?.steps ?? []).some((s) => /drive|car/i.test(s.mode))],
+    ],
+  },
+  {
     name: "Asks when the destination is missing",
     message: "Trains at Lee are cancelled. What do I do?",
     checks: (t) => [

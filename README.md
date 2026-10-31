@@ -4,7 +4,9 @@
 
 Last Sunday at Lee station, staff at the entrance said every train was cancelled because of the wind. Google Maps and Citymapper still routed me through Lee. I didn't know my options, so I guessed: a taxi to Lewisham, a bigger station with more lines. It worked, but I worked it out alone and late.
 
-Plan B is an agent you tell what the staff just told you. It treats your report as true, works out what it knocks out, finds the nearest interchange **on a different network**, checks every line live, prices a taxi hop, and gives you a Plan A and a Plan B. Your report is then shared, so the next traveller is warned before the official feeds catch up.
+Think of it as the "my situation isn't on the map yet" button your maps app is missing. When the apps are right, use the apps. Plan B is for the gap, on public transport or on the road, and when the official feeds catch up it uses them too.
+
+Plan B is an agent you tell what the staff just told you (or what you see on the road ahead). It treats your report as true, works out what it knocks out, finds the nearest interchange **on a different network**, checks every line live, prices a taxi hop, and gives you a Plan A and a Plan B. Your report is then shared, so the next traveller is warned before the official feeds catch up.
 
 Built for the GDG London AI DevCamp Agentic Hackathon (31 October 2026).
 
@@ -20,6 +22,7 @@ plan_b (SequentialAgent)
        transit_scout          public transport straight from you, avoiding what is broken
        hub_scout              taxi hop to the best escape hub, then onward (with live departures)
        taxi_scout             door to door, the fallback
+       road_scout             drivers: detours around the incident (blocked route vs clear detours)
   3. verify_loop (LoopAgent)  live status of every line in every option; re-plans an option that fails
   4. presenter                ranks by deadline, reliability and cost; shows Plan A / Plan B
 ```
@@ -34,6 +37,7 @@ ADK features used, each for a reason:
 | `beforeToolCallback` guardrail | No agent can plan through a line the traveller reported as down, even if the model forgets |
 | `beforeAgentCallback` | Fetches the live status of every line the scouts used before the verifier thinks (one model round trip saved) |
 | `outputKey` + session state | Agents hand structured JSON to each other |
+| `beforeAgentCallback` on scouts | Scouts that don't apply (Tube scouts for a driver, the road scout for a commuter) are skipped in code, with no model call |
 | `EXIT_LOOP`, `skipSummarization` | The loop ends when every option is checked; the plan cards are the answer, with no extra model call |
 | Thinking level `LOW`; scouts on `gemini-3.5-flash-lite` | Tools do the heavy lifting; the Lee scenario answers in about 26 seconds instead of five minutes, with the same evaluation results |
 | `BasePlugin.onToolErrorCallback` (tool resilience plugin) | A dropped MCP connection or a TfL timeout is retried once, then reported to the model instead of crashing the run |
@@ -52,6 +56,8 @@ Shared reports: `/api/reports` feeds the live ticker, so a second phone sees wha
 | `plan_journey` | TfL Journey Planner, filtered to avoid broken modes and lines |
 | `next_departures` | TfL live arrivals |
 | `taxi_estimate` | OSRM road route adjusted for London traffic, with a fare range (an estimate, not a quote) |
+| `drive_routes` | OSRM driving routes; routes through the reported incident are marked, detours built around it (either side, or turning back) |
+| `road_disruptions` | TfL's official road-disruption feed near a point: is the driver ahead of the feed? |
 
 ## Run it
 
@@ -87,6 +93,7 @@ npx tsx scripts/run-agent.ts "I'm at Lee station, trains are cancelled because o
 |---|---|
 | Lee, trains cancelled by wind | report recorded against Southeastern; stations scanned with it down; all three scouts run; at least two options; Plan A avoids National Rail; no step rides Southeastern; the insight names an escape hub |
 | "I never take taxis" with Lewisham DLR closed | `remember_preference` called; a plan is presented; no option uses a taxi; nothing rides the closed DLR |
+| Driver: crash ahead on the A2 | road scout routes around the incident; TfL road feed checked; no public transport planned; a driving plan is presented |
 | Destination missing | no plan is guessed; the traveller is asked a question; scouts don't plan journeys |
 
 Latest run: 14/14 checks passed; the Lee scenario answers in about 26 seconds.
