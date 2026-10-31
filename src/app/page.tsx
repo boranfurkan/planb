@@ -7,6 +7,7 @@ import { Composer, type SendOptions } from "@/components/plan-b/composer";
 import { affectedStations, knownPlaces } from "@/components/plan-b/format";
 import type { MapData } from "@/components/plan-b/journey-map";
 import { Pipeline } from "@/components/plan-b/pipeline";
+import { PhoneQr } from "@/components/plan-b/phone-qr";
 import { PlanCards } from "@/components/plan-b/plan-cards";
 import { ReportsTicker } from "@/components/plan-b/reports-ticker";
 import { type Turn, usePlanB } from "@/components/plan-b/use-plan-b";
@@ -42,6 +43,7 @@ function Header() {
           <span className="pb-pulse h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true" />
           Live TfL data
         </span>
+        <PhoneQr />
         <BoardClock />
       </div>
     </header>
