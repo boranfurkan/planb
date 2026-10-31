@@ -35,7 +35,8 @@ ADK features used, each for a reason:
 | `beforeAgentCallback` | Fetches the live status of every line the scouts used before the verifier thinks (one model round trip saved) |
 | `outputKey` + session state | Agents hand structured JSON to each other |
 | `EXIT_LOOP`, `skipSummarization` | The loop ends when every option is checked; the plan cards are the answer, with no extra model call |
-| Thinking level `LOW` | Tools do the heavy lifting; answers in about a minute instead of five |
+| Thinking level `LOW`; scouts on `gemini-3.5-flash-lite` | Tools do the heavy lifting; the Lee scenario answers in about 26 seconds instead of five minutes, with the same evaluation results |
+| `BasePlugin.onToolErrorCallback` (tool resilience plugin) | A dropped MCP connection or a TfL timeout is retried once, then reported to the model instead of crashing the run |
 | User-scoped state (`user:preferences`) + `remember_preference` | Lasting preferences like "no taxis" follow the traveller to the next trip |
 
 Voice: speak your situation (browser speech recognition, en-GB) and hear the plan (Gemini TTS, `gemini-3.8-flash-tts`, via `/api/speak`).
@@ -88,7 +89,7 @@ npx tsx scripts/run-agent.ts "I'm at Lee station, trains are cancelled because o
 | "I never take taxis" with Lewisham DLR closed | `remember_preference` called; a plan is presented; no option uses a taxi; nothing rides the closed DLR |
 | Destination missing | no plan is guessed; the traveller is asked a question; scouts don't plan journeys |
 
-Latest run: 14/14 checks passed.
+Latest run: 14/14 checks passed; the Lee scenario answers in about 26 seconds.
 
 ## Deploy
 

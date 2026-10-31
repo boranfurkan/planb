@@ -10,6 +10,8 @@
 //     3. verifier (LoopAgent, max 2 rounds)  live-checks every line in every option, re-plans what fails
 //     4. presenter           Plan A / Plan B cards
 import {
+  type BaseTool,
+  BasePlugin,
   type Context,
   EXIT_LOOP,
   FunctionTool,
@@ -29,7 +31,8 @@ import { addReport, recentReports } from "./reports";
 import { lineStatus } from "./tfl";
 
 export const MODEL = process.env.PLANB_MODEL || "gemini-3.8-flash";
-const SCOUT_MODEL = process.env.PLANB_SCOUT_MODEL || MODEL;
+// Scouts do narrow, tool-driven work: the lighter model halves their time with the same evaluation results.
+const SCOUT_MODEL = process.env.PLANB_SCOUT_MODEL || "gemini-3.5-flash-lite";
 export const APP_NAME = "planb";
 
 const mcpUrl = () => process.env.MCP_URL || `http://127.0.0.1:${process.env.PORT || 3000}/api/mcp`;
@@ -329,7 +332,21 @@ export const planB = new SequentialAgent({
   subAgents: [situationAnalyst, scouts, verifier, presenter],
 });
 
+/** A tool that fails (a dropped MCP connection, a TfL timeout) is retried once; if it fails again the model gets a clear error, not a crash. */
+class ToolResilience extends BasePlugin {
+  constructor() {
+    super("tool_resilience");
+  }
+  override async onToolErrorCallback({ tool, toolArgs, toolContext, error }: { tool: BaseTool; toolArgs: Record<string, unknown>; toolContext: Context; error: Error }) {
+    try {
+      return (await tool.runAsync({ args: toolArgs, toolContext })) as Record<string, unknown>;
+    } catch {
+      return { error: `${tool.name} is temporarily unavailable (${error.message.slice(0, 120)}). Retry once, or continue with what you already have.` };
+    }
+  }
+}
+
 // Sessions live on globalThis so they survive hot reloads; the runner is rebuilt with the current agents.
 const gs = globalThis as unknown as { __planbSessions?: InMemorySessionService };
 const sessionService = (gs.__planbSessions ??= new InMemorySessionService());
-export const runner = new Runner({ agent: planB, appName: APP_NAME, sessionService });
+export const runner = new Runner({ agent: planB, appName: APP_NAME, sessionService, plugins: [new ToolResilience()] });
