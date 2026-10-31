@@ -96,7 +96,7 @@ npx tsx scripts/run-agent.ts "I'm at Lee station, trains are cancelled because o
 | Driver: crash ahead on the A2 | road scout routes around the incident; TfL road feed checked; no public transport planned; a driving plan is presented |
 | Destination missing | no plan is guessed; the traveller is asked a question; scouts don't plan journeys |
 
-Latest run: 14/14 checks passed; the Lee scenario answers in about 26 seconds.
+Latest run: 18/18 checks passed; the Lee scenario answers in about 27 seconds, the driving one in about 19.
 
 ## Deploy
 
