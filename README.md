@@ -36,6 +36,10 @@ ADK features used, each for a reason:
 | `outputKey` + session state | Agents hand structured JSON to each other |
 | `EXIT_LOOP`, `skipSummarization` | The loop ends when every option is checked; the plan cards are the answer, with no extra model call |
 | Thinking level `LOW` | Tools do the heavy lifting; answers in about a minute instead of five |
+| User-scoped state (`user:preferences`) + `remember_preference` | Lasting preferences like "no taxis" follow the traveller to the next trip |
+
+Voice: speak your situation (browser speech recognition, en-GB) and hear the plan (Gemini TTS, `gemini-3.8-flash-tts`, via `/api/speak`).
+Shared reports: `/api/reports` feeds the live ticker, so a second phone sees what the first traveller reported.
 
 ### London Live MCP server
 
@@ -73,6 +77,18 @@ Run the pipeline from the terminal, with timestamps for every step:
 set -a; source .env.local; set +a
 npx tsx scripts/run-agent.ts "I'm at Lee station, trains are cancelled because of the wind. I need to be at N1 6DA by 13:45."
 ```
+
+## Evaluation
+
+`npm run eval` (with `.env.local` loaded and the dev server running) runs real scenarios through the ADK runner, on live TfL data, in parallel, and checks behaviour rather than wording:
+
+| Scenario | Checks |
+|---|---|
+| Lee, trains cancelled by wind | report recorded against Southeastern; stations scanned with it down; all three scouts run; at least two options; Plan A avoids National Rail; no step rides Southeastern; the insight names an escape hub |
+| "I never take taxis" with Lewisham DLR closed | `remember_preference` called; a plan is presented; no option uses a taxi; nothing rides the closed DLR |
+| Destination missing | no plan is guessed; the traveller is asked a question; scouts don't plan journeys |
+
+Latest run: 14/14 checks passed.
 
 ## Deploy
 
