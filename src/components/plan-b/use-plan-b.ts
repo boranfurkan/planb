@@ -6,6 +6,7 @@ import type { ToolCall } from "./format";
 
 export type Turn = {
   message: string;
+  voice: boolean;
   startedAt: number;
   calls: ToolCall[];
   agents: string[];
@@ -51,25 +52,42 @@ function apply(turn: Turn, ev: StreamItem): Turn {
   }
 }
 
+const USER_KEY = "planb:user";
+
+/** One id per browser, so remembered preferences follow the traveller. Storage can be blocked: fall back to a fresh id. */
+function browserUserId() {
+  try {
+    const existing = localStorage.getItem(USER_KEY);
+    if (existing) return existing;
+    const id = crypto.randomUUID();
+    localStorage.setItem(USER_KEY, id);
+    return id;
+  } catch {
+    return crypto.randomUUID();
+  }
+}
+
 export function usePlanB() {
   const [turns, setTurns] = useState<Turn[]>([]);
   const session = useRef<string | null>(null);
+  const user = useRef<string | null>(null);
   const busy = turns.some((t) => t.running);
 
   const send = useCallback(
-    async (message: string) => {
+    async (message: string, opts?: { voice?: boolean }) => {
       const text = message.trim();
       if (!text || busy) return;
       session.current ??= crypto.randomUUID();
+      user.current ??= browserUserId();
       const idx = turns.length;
-      setTurns((ts) => [...ts, { message: text, startedAt: Date.now(), calls: [], agents: [], outputs: {}, errors: [], text: "", running: true }]);
+      setTurns((ts) => [...ts, { message: text, voice: Boolean(opts?.voice), startedAt: Date.now(), calls: [], agents: [], outputs: {}, errors: [], text: "", running: true }]);
       const update = (f: (t: Turn) => Turn) => startTransition(() => setTurns((ts) => ts.map((t, i) => (i === idx ? f(t) : t))));
 
       try {
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: text, sessionId: session.current }),
+          body: JSON.stringify({ message: text, sessionId: session.current, userId: user.current }),
         });
         if (!res.ok || !res.body) throw new Error((await res.text()) || `Request failed (${res.status})`);
         const reader = res.body.getReader();

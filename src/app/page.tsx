@@ -3,11 +3,12 @@
 import dynamic from "next/dynamic";
 import { Activity } from "@/components/plan-b/activity";
 import { BoardClock } from "@/components/plan-b/board-clock";
-import { Composer } from "@/components/plan-b/composer";
+import { Composer, type SendOptions } from "@/components/plan-b/composer";
 import { affectedStations, knownPlaces } from "@/components/plan-b/format";
 import type { MapData } from "@/components/plan-b/journey-map";
 import { Pipeline } from "@/components/plan-b/pipeline";
 import { PlanCards } from "@/components/plan-b/plan-cards";
+import { ReportsTicker } from "@/components/plan-b/reports-ticker";
 import { type Turn, usePlanB } from "@/components/plan-b/use-plan-b";
 import { parseAgentJson } from "@/lib/agent-json";
 import type { Situation } from "@/lib/plan-types";
@@ -47,7 +48,7 @@ function Header() {
   );
 }
 
-function Hero({ busy, onSend }: { busy: boolean; onSend: (t: string) => void }) {
+function Hero({ busy, onSend }: { busy: boolean; onSend: (t: string, opts?: SendOptions) => void }) {
   return (
     <section className="mx-auto max-w-3xl py-16 text-center sm:py-24">
       <p className="mb-4 font-mono text-xs uppercase tracking-[0.3em] text-amber-300/80">Lee station · Sunday morning · trains cancelled</p>
@@ -57,7 +58,7 @@ function Hero({ busy, onSend }: { busy: boolean; onSend: (t: string) => void }) 
         <span className="text-amber-400">The apps don’t know yet.</span>
       </h1>
       <p className="mx-auto mt-5 max-w-xl text-base text-pretty text-slate-400 sm:text-lg">
-        Tell Plan B what the staff just told you. Six AI agents check live London data, find the nearest interchange that still works, and get you
+        Tell Plan B what the staff just told you, or just say it. Six AI agents check live London data, find the nearest interchange that still works, and get you
         moving.
       </p>
       <div className="mt-8 text-left">
@@ -95,7 +96,7 @@ function Run({ turn }: { turn: Turn }) {
           </div>
         </div>
         {turn.plan ? (
-          <PlanCards plan={turn.plan} aheadOfFeeds={aheadOfFeeds} />
+          <PlanCards plan={turn.plan} aheadOfFeeds={aheadOfFeeds} speak={turn.voice} />
         ) : turn.running ? (
           <p className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-slate-500">
             Plan A and Plan B appear here once every line is checked live…
@@ -122,6 +123,7 @@ export default function Home() {
     <main className="pb-bg min-h-screen text-slate-100">
       <div className="mx-auto max-w-[1400px] px-4 py-5 sm:px-6">
         <Header />
+        <ReportsTicker />
         {current ? (
           <div className="space-y-5 pt-5">
             <Composer busy={busy} onSend={send} followUp />

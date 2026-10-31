@@ -82,6 +82,24 @@ const recentReportsTool = new FunctionTool({
   execute: async ({ hours }) => ({ reports: recentReports(hours ?? 6).slice(0, 20) }),
 });
 
+// ---------- memory: lasting preferences, kept in ADK user-scoped state ("user:" keys outlive the session) ----------
+
+const PREFS_KEY = "user:preferences";
+
+const rememberPreference = new FunctionTool({
+  name: "remember_preference",
+  description:
+    "Remember a lasting travel preference the traveller states, for this and future trips (e.g. 'no taxis', 'step-free only', 'budget £10', 'avoid buses').",
+  parameters: z.object({ preference: z.string().describe("Short, e.g. 'no taxis' or 'step-free only'") }),
+  execute: async ({ preference }, ctx?: Context) => {
+    if (!ctx) return { remembered: false };
+    const prefs = ctx.state.get<string[]>(PREFS_KEY) ?? [];
+    const next = [...new Set([...prefs, preference.trim().toLowerCase()])].slice(-10);
+    ctx.state.set(PREFS_KEY, next);
+    return { remembered: true, preferences: next };
+  },
+});
+
 /** Guardrail: no scout may plan through a line the traveller reported as down, even if the model forgets. */
 function enforceBrokenLines({ tool, args, context }: { tool: { name: string }; args: Record<string, unknown>; context: Context }) {
   if (tool.name !== "plan_journey") return undefined;
@@ -141,10 +159,12 @@ const situationAnalyst = new LlmAgent({
   description: "Understands the traveller's report, locates places, records the report and finds escape hubs.",
   model: MODEL,
   generateContentConfig: CONFIG,
-  tools: [londonLive(["find_place", "nearby_stations", "line_status"]), reportDisruption, recentReportsTool],
+  tools: [londonLive(["find_place", "nearby_stations", "line_status"]), reportDisruption, recentReportsTool, rememberPreference],
   outputKey: "situation",
-  instruction: () => `You are the situation analyst in Plan B, a London travel agent for the moment journey apps are behind reality.
+  instruction: (ctx) => `You are the situation analyst in Plan B, a London travel agent for the moment journey apps are behind reality.
 Current London time: ${londonNow()}.
+What you remember about this traveller from earlier trips: ${stateText(ctx, PREFS_KEY)}. Treat these as constraints.
+If they state a lasting preference now ("I never take taxis", "I use a wheelchair", "my budget is £10"), call remember_preference.
 
 The traveller reports something the apps may not know yet, like "staff at Lee say trains are cancelled because of the wind".
 Treat it as true even when official feeds say Good Service. Use the whole conversation: a follow-up like "I can't afford a taxi" changes the constraints.
@@ -222,7 +242,8 @@ const taxiScout = new LlmAgent({
   outputKey: "taxi_option",
   instruction: (ctx) => `You are the taxi scout in Plan B.
 ${scoutPreamble(ctx)}
-Call taxi_estimate from the origin to the destination once. ${OPTION_FORMAT}
+If the constraints or remembered preferences rule out taxis, reply only {"skipped":true}.
+Otherwise call taxi_estimate from the origin to the destination once. ${OPTION_FORMAT}
 Use "kind":"taxi", one step, linesUsed [].`,
 });
 

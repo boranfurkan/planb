@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { Plan, PlanOption } from "@/lib/plan-types";
 import { MODE_ICON } from "./format";
+import { ReadAloud } from "./read-aloud";
 
 const RELIABILITY: Record<PlanOption["reliability"], string> = {
   high: "bg-emerald-400/15 text-emerald-300 ring-emerald-400/30",
@@ -49,7 +50,7 @@ function Ticket({ option, primary }: { option: PlanOption; primary: boolean }) {
   );
 }
 
-export function PlanCards({ plan, aheadOfFeeds }: { plan: Plan; aheadOfFeeds: boolean }) {
+export function PlanCards({ plan, aheadOfFeeds, speak }: { plan: Plan; aheadOfFeeds: boolean; speak: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -66,7 +67,10 @@ export function PlanCards({ plan, aheadOfFeeds }: { plan: Plan; aheadOfFeeds: bo
           </p>
         ) : null}
         <h2 className="text-2xl font-bold text-balance text-white sm:text-3xl">{plan.headline}</h2>
-        <p className="mt-1 text-sm text-pretty text-slate-400">{plan.understood}</p>
+        <div className="mt-1 flex flex-wrap items-center gap-3">
+          <p className="min-w-0 flex-1 text-sm text-pretty text-slate-400">{plan.understood}</p>
+          <ReadAloud plan={plan} autoPlay={speak} />
+        </div>
       </div>
       <div className="rounded-xl border border-amber-400/30 bg-amber-400/[0.08] px-4 py-3 text-sm text-pretty text-amber-50">
         <span className="font-semibold text-amber-300">The key move: </span>

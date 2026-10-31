@@ -10,6 +10,7 @@ import { shortStation } from "./format";
 export type MapData = { origin?: LatLon; destination?: LatLon; hubs: LatLon[]; affected: LatLon[] };
 
 const LONDON: L.LatLngTuple = [51.505, -0.09];
+const DARK_TILES = "invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9) saturate(0.6)";
 
 const pin = (cls: string, html: string) => L.divIcon({ className: "", html: `<div class="pb-pin ${cls}">${html}</div>`, iconSize: [0, 0] });
 
@@ -23,12 +24,13 @@ export default function JourneyMap({ data }: { data: MapData }) {
   useEffect(() => {
     if (!el.current || map.current) return;
     const m = L.map(el.current, { zoomControl: false, attributionControl: true, scrollWheelZoom: false }).setView(LONDON, 11);
-    // OpenStreetMap tiles, darkened in CSS (.pb-dark-tiles): no API key needed.
+    // OpenStreetMap tiles (no API key), darkened to match the page.
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxZoom: 19,
-      className: "pb-dark-tiles",
     }).addTo(m);
+    const tiles = m.getPane("tilePane");
+    if (tiles) tiles.style.filter = DARK_TILES;
     L.control.zoom({ position: "bottomright" }).addTo(m);
     map.current = m;
     layer.current = L.layerGroup().addTo(m);

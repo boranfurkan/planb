@@ -1,6 +1,7 @@
 "use client";
-// Where the traveller says what's wrong. Enter sends, Shift+Enter adds a line.
+// Where the traveller says what's wrong: type it, or tap the mic and say it. Enter sends, Shift+Enter adds a line.
 import { useState } from "react";
+import { useSpeechInput } from "./use-speech-input";
 
 export const EXAMPLES = [
   {
@@ -11,7 +12,37 @@ export const EXAMPLES = [
   { label: "Central line suspended", text: "I'm at Stratford, the Central line just got suspended and I need to reach Liverpool Street in 30 minutes. Cheap options please." },
 ];
 
-export function Composer({ busy, onSend, followUp }: { busy: boolean; onSend: (text: string) => void; followUp: boolean }) {
+export type SendOptions = { voice?: boolean };
+
+function MicButton({ busy, onVoice }: { busy: boolean; onVoice: (text: string) => void }) {
+  const speech = useSpeechInput(onVoice);
+  if (!speech.supported) return null;
+  return (
+    <>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={speech.listening ? speech.stop : speech.start}
+        aria-label={speech.listening ? "Stop listening" : "Speak your situation"}
+        aria-pressed={speech.listening}
+        className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl border transition-colors focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:outline-none disabled:opacity-40 ${
+          speech.listening ? "border-rose-400 bg-rose-500/20 text-rose-200" : "border-white/15 text-slate-200 hover:border-amber-400"
+        }`}
+      >
+        <span aria-hidden="true" className={speech.listening ? "pb-pulse" : undefined}>
+          🎙️
+        </span>
+      </button>
+      {speech.listening || speech.interim || speech.error ? (
+        <p aria-live="polite" className={`basis-full text-sm ${speech.error ? "text-rose-300" : "text-amber-200"}`}>
+          {speech.error ?? (speech.listening ? `Listening… ${speech.interim}` : speech.interim)}
+        </p>
+      ) : null}
+    </>
+  );
+}
+
+export function Composer({ busy, onSend, followUp }: { busy: boolean; onSend: (text: string, opts?: SendOptions) => void; followUp: boolean }) {
   const [text, setText] = useState("");
   const submit = () => {
     if (!text.trim() || busy) return;
@@ -64,13 +95,16 @@ export function Composer({ busy, onSend, followUp }: { busy: boolean; onSend: (t
                 {ex.label}
               </button>
             ))}
-        <button
-          type="submit"
-          disabled={busy || !text.trim()}
-          className="ml-auto rounded-xl bg-amber-400 px-4 py-2 text-sm font-semibold text-slate-950 transition-colors hover:bg-amber-300 focus-visible:ring-2 focus-visible:ring-amber-200 focus-visible:outline-none disabled:opacity-40"
-        >
-          {busy ? "Re-Planning…" : followUp ? "Re-Plan" : "Find My Plan B"}
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          <MicButton busy={busy} onVoice={(spoken) => onSend(spoken, { voice: true })} />
+          <button
+            type="submit"
+            disabled={busy || !text.trim()}
+            className="h-10 rounded-xl bg-amber-400 px-4 text-sm font-semibold text-slate-950 transition-colors hover:bg-amber-300 focus-visible:ring-2 focus-visible:ring-amber-200 focus-visible:outline-none disabled:opacity-40"
+          >
+            {busy ? "Re-Planning…" : followUp ? "Re-Plan" : "Find My Plan B"}
+          </button>
+        </div>
       </div>
     </form>
   );

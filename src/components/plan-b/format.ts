@@ -25,6 +25,7 @@ export const TOOL_ICON: Record<string, string> = {
   report_disruption: "📣",
   recent_reports: "👥",
   exit_loop: "🏁",
+  remember_preference: "🧠",
 };
 
 export const MODE_ICON: Record<string, string> = {
@@ -160,6 +161,8 @@ export function describe(call: ToolCall, known: LatLon[]): { title: string; deta
     }
     case "exit_loop":
       return { title: "Every option checked" };
+    case "remember_preference":
+      return { title: `Remembering for next time: ${a.preference}` };
     default:
       return { title: call.name, detail: typeof r === "string" ? r.slice(0, 160) : undefined };
   }

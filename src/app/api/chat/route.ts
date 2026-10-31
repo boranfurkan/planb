@@ -11,7 +11,11 @@ const short = (v: unknown, n = 1500) => {
 
 export async function POST(request: Request) {
   if (isRateLimited(request)) return new Response("Too many runs from you in the last 10 minutes. Try again shortly.", { status: 429 });
-  const { message, sessionId, userId = "traveller" } = (await request.json()) as { message: string; sessionId: string; userId?: string };
+  const body = (await request.json()) as { message?: string; sessionId?: string; userId?: string };
+  const message = body.message ?? "";
+  const sessionId = body.sessionId ?? "";
+  // One id per browser, so remembered preferences follow the traveller; anything odd falls back to a shared id.
+  const userId = /^[\w-]{8,64}$/.test(body.userId ?? "") ? (body.userId as string) : "traveller";
   if (!message?.trim() || !sessionId) return new Response("message and sessionId are required", { status: 400 });
 
   await runner.sessionService.getOrCreateSession({ appName: APP_NAME, userId, sessionId });
