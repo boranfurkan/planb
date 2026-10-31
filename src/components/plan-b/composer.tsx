@@ -1,7 +1,7 @@
 "use client";
 // Where the traveller says what's wrong: type it, or tap the mic and say it. Enter sends, Shift+Enter adds a line.
 import { useState } from "react";
-import { useSpeechInput } from "./use-speech-input";
+import { useVoiceInput } from "./use-voice-input";
 
 export const EXAMPLES = [
   {
@@ -14,28 +14,42 @@ export const EXAMPLES = [
 
 export type SendOptions = { voice?: boolean };
 
+const VOICE_HINT = {
+  listening: "Listening… speak now, it stops when you pause",
+  transcribing: "Transcribing with Gemini…",
+} as const;
+
 function MicButton({ busy, onVoice }: { busy: boolean; onVoice: (text: string) => void }) {
-  const speech = useSpeechInput(onVoice);
-  if (!speech.supported) return null;
+  const voice = useVoiceInput(onVoice);
+  if (!voice.supported) return null;
+  const listening = voice.status === "listening";
+  const line =
+    voice.status === "error"
+      ? voice.error
+      : voice.status === "listening" || voice.status === "transcribing"
+        ? VOICE_HINT[voice.status]
+        : voice.transcript
+          ? `“${voice.transcript}”`
+          : null;
   return (
     <>
       <button
         type="button"
-        disabled={busy}
-        onClick={speech.listening ? speech.stop : speech.start}
-        aria-label={speech.listening ? "Stop listening" : "Speak your situation"}
-        aria-pressed={speech.listening}
+        disabled={busy || voice.status === "transcribing"}
+        onClick={listening ? voice.stop : voice.start}
+        aria-label={listening ? "Stop recording" : "Speak your situation"}
+        aria-pressed={listening}
         className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl border transition-colors focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:outline-none disabled:opacity-40 ${
-          speech.listening ? "border-rose-400 bg-rose-500/20 text-rose-200" : "border-white/15 text-slate-200 hover:border-amber-400"
+          listening ? "border-rose-400 bg-rose-500/20 text-rose-200" : "border-white/15 text-slate-200 hover:border-amber-400"
         }`}
       >
-        <span aria-hidden="true" className={speech.listening ? "pb-pulse" : undefined}>
+        <span aria-hidden="true" className={listening ? "pb-pulse" : undefined}>
           🎙️
         </span>
       </button>
-      {speech.listening || speech.interim || speech.error ? (
-        <p aria-live="polite" className={`basis-full text-sm ${speech.error ? "text-rose-300" : "text-amber-200"}`}>
-          {speech.error ?? (speech.listening ? `Listening… ${speech.interim}` : speech.interim)}
+      {line ? (
+        <p aria-live="polite" className={`order-last basis-full text-sm ${voice.status === "error" ? "text-rose-300" : "text-amber-200"}`}>
+          {line}
         </p>
       ) : null}
     </>

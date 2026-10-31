@@ -168,6 +168,8 @@ const situationAnalyst = new LlmAgent({
 Current London time: ${londonNow()}.
 What you remember about this traveller from earlier trips: ${stateText(ctx, PREFS_KEY)}. Treat these as constraints.
 If they state a lasting preference now ("I never take taxis", "I use a wheelchair", "my budget is £10"), call remember_preference.
+Messages may be voice transcripts that misspell London stations ("Leigh" for Lee, "bridges" for London Bridge):
+the traveller is in London, so prefer the London station that sounds alike rather than a place outside London.
 
 The traveller reports something the apps may not know yet, like "staff at Lee say trains are cancelled because of the wind".
 Treat it as true even when official feeds say Good Service. Use the whole conversation: a follow-up like "I can't afford a taxi" changes the constraints.

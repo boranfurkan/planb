@@ -99,12 +99,18 @@ function Run({ turn }: { turn: Turn }) {
         </div>
         {turn.plan ? (
           <PlanCards plan={turn.plan} aheadOfFeeds={aheadOfFeeds} speak={turn.voice} />
+        ) : !turn.running && turn.text ? (
+          <section aria-label="Plan B needs one detail" className="rounded-2xl border border-amber-400/50 bg-amber-400/[0.08] p-5">
+            <p className="font-mono text-xs font-bold uppercase tracking-[0.2em] text-amber-300">One quick question</p>
+            <p className="mt-2 text-lg text-pretty text-white">{turn.text}</p>
+            <p className="mt-2 text-sm text-slate-400">Answer in the box above, by typing or with the mic.</p>
+          </section>
         ) : turn.running ? (
           <p className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-slate-500">
             Plan A and Plan B appear here once every line is checked live…
           </p>
         ) : null}
-        {turn.text ? <p className="text-sm text-slate-300">{turn.text}</p> : null}
+        {turn.plan && turn.text ? <p className="text-sm text-slate-300">{turn.text}</p> : null}
         {turn.errors.length > 0 ? (
           <div role="alert" className="space-y-1 rounded-xl bg-rose-500/10 p-3 text-sm text-rose-200">
             {[...new Set(turn.errors)].slice(0, 3).map((e) => (
